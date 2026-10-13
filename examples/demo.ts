@@ -1,6 +1,6 @@
 /**
  * Self-contained demo: spins up a tiny in-process FIX acceptor, then uses a
- * fixwire Session (the initiator — the real library) to log on, send an order,
+ * fixwire Session (the initiator - the real library) to log on, send an order,
  * receive an ExecutionReport, and log out. No external server needed.
  *
  *   npm run demo

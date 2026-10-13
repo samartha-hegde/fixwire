@@ -53,7 +53,7 @@ export function checksum(s: string): string {
 /**
  * Encode fields into a complete FIX wire string.
  * `fields` must start with tag 35 (MsgType) and include all body fields in order,
- * EXCLUDING 8 (BeginString), 9 (BodyLength) and 10 (CheckSum) — those are added here.
+ * EXCLUDING 8 (BeginString), 9 (BodyLength) and 10 (CheckSum) - those are added here.
  */
 export function encode(fields: Field[], beginString = 'FIX.4.4'): string {
   const body = fields.map(([t, v]) => `${t}=${v}`).join(SOH) + SOH;
@@ -116,7 +116,7 @@ export class FixParser {
       return this.tryExtract();
     }
 
-    // Locate the BodyLength field (9=...) — its value frames the rest of the message.
+    // Locate the BodyLength field (9=...) - its value frames the rest of the message.
     const blStart = buf.indexOf(`${SOH}9=`);
     if (blStart === -1) return null;
     const valStart = blStart + 3; // past SOH + "9="
@@ -125,7 +125,7 @@ export class FixParser {
 
     const bodyLen = Number(buf.slice(valStart, valEnd));
     if (!Number.isInteger(bodyLen) || bodyLen < 0) {
-      // Corrupt length — skip this BeginString and resync on the next one.
+      // Corrupt length - skip this BeginString and resync on the next one.
       this.buf = buf.slice(valEnd + 1);
       return this.tryExtract();
     }

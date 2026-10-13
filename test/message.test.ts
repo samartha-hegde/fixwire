@@ -10,7 +10,7 @@ test('isChecksumValid accepts a real message and rejects a tampered one', () => 
     [34, '1'],
   ]);
   assert.ok(isChecksumValid(wire));
-  // Flip the checksum digits — must now be rejected.
+  // Flip the checksum digits - must now be rejected.
   const tampered = wire.slice(0, -4) + 'XXX' + SOH;
   assert.equal(isChecksumValid(tampered), false);
 });
@@ -72,7 +72,7 @@ test('streaming parser frames split and batched messages', () => {
   // Two messages arriving in one chunk.
   assert.equal(parser.append(a + b).length, 2);
 
-  // One message split across three chunks — nothing emitted until complete.
+  // One message split across three chunks - nothing emitted until complete.
   const mid = Math.floor(a.length / 2);
   assert.equal(parser.append(a.slice(0, mid)).length, 0);
   assert.equal(parser.append(a.slice(mid, a.length - 2)).length, 0);

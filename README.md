@@ -6,12 +6,12 @@
 [![node](https://img.shields.io/node/v/fixwire.svg)](https://nodejs.org)
 
 A modern, fully-typed **FIX protocol** engine for TypeScript. **Zero runtime
-dependencies**, a correct session layer, and an API that feels like 2026 — not a
+dependencies**, a correct session layer, and an API that feels like 2026 - not a
 Java port from 2004.
 
 > **Status: v0.1 (early but solid).** FIX 4.4, initiator (client) side. The
-> session state machine — logon, heartbeats, test requests, sequence tracking,
-> gap detection, **true resend/replay**, inbound validation and reconnect — is
+> session state machine - logon, heartbeats, test requests, sequence tracking,
+> gap detection, **true resend/replay**, inbound validation and reconnect - is
 > implemented and tested. See the [Roadmap](#roadmap) for what's next.
 
 ## Why
@@ -19,7 +19,7 @@ Java port from 2004.
 The mature FIX engines (QuickFIX/J, quickfixgo, QuickFIX) are battle-tested but
 live in Java / Go / C++. In TypeScript the options are thin. fixwire aims to be
 the one you reach for: **typed messages, async-first, great docs, and a session
-layer that gets the hard parts right** — the resend / gap-fill / sequence-reset
+layer that gets the hard parts right** - the resend / gap-fill / sequence-reset
 edge cases that quietly break lesser implementations at 3am.
 
 ## Install
@@ -69,7 +69,7 @@ session.connect();
 ```
 
 Prefer raw fields? `session.send(MsgType.NewOrderSingle, [[Tag.ClOrdID, 'order-1'], ...])`
-works too — the builder is just sugar.
+works too - the builder is just sugar.
 
 ## Examples
 
@@ -87,9 +87,9 @@ against a real counterparty.
 
 | Option          | Type                          | Default              | Notes                                            |
 | --------------- | ----------------------------- | -------------------- | ------------------------------------------------ |
-| `senderCompId`  | `string`                      | —                    | Your CompID.                                     |
-| `targetCompId`  | `string`                      | —                    | The counterparty's CompID.                       |
-| `host` / `port` | `string` / `number`           | —                    | Where to connect.                                |
+| `senderCompId`  | `string`                      | -                    | Your CompID.                                     |
+| `targetCompId`  | `string`                      | -                    | The counterparty's CompID.                       |
+| `host` / `port` | `string` / `number`           | -                    | Where to connect.                                |
 | `tls`           | `boolean \| TLSOptions`       | `false`              | `true` for default TLS, or pass connection opts. |
 | `beginString`   | `string`                      | `FIX.4.4`            | FIX version string.                              |
 | `heartBtInt`    | `number`                      | `30`                 | Heartbeat interval, seconds.                     |
@@ -105,7 +105,7 @@ and a `status` getter.
 
 | Event          | Payload              | Fires when                                   |
 | -------------- | -------------------- | -------------------------------------------- |
-| `connect`      | —                    | Socket (and TLS handshake) established       |
+| `connect`      | -                    | Socket (and TLS handshake) established       |
 | `logon`        | `FixMessage`         | Logon accepted, session active               |
 | `app`          | `FixMessage`         | An application message arrived (in sequence) |
 | `message`      | `FixMessage`         | Every inbound message (raw firehose)         |
@@ -113,7 +113,7 @@ and a `status` getter.
 | `sent`         | `string`             | A message was written to the wire            |
 | `reconnecting` | `(attempt, delayMs)` | A reconnect attempt is scheduled             |
 | `logout`       | `FixMessage`         | Logout received                              |
-| `close`        | —                    | Socket closed                                |
+| `close`        | -                    | Socket closed                                |
 | `error`        | `Error`              | Socket or protocol error                     |
 
 Event payloads are fully typed.
@@ -126,20 +126,20 @@ with `Side` / `OrdType` / `TimeInForce`.
 
 ## What's handled
 
-- **Framing** — streaming parser frames messages by `BodyLength`, so split and
+- **Framing** - streaming parser frames messages by `BodyLength`, so split and
   batched TCP reads Just Work.
-- **Integrity** — checksum computed and validated (checked against a known
+- **Integrity** - checksum computed and validated (checked against a known
   QuickFIX vector); corrupt inbound messages are discarded without advancing
   the sequence.
-- **Session layer** — logon, heartbeat, test request / response, logout
+- **Session layer** - logon, heartbeat, test request / response, logout
   handshake, sequence tracking, **gap detection → ResendRequest**, and
   **SequenceReset / gap-fill** handling.
-- **Resend / replay** — application messages are retained and retransmitted with
+- **Resend / replay** - application messages are retained and retransmitted with
   `PossDupFlag` + `OrigSendingTime` on request; admin runs are gap-filled.
-- **Validation** — CompID checks and a session-level `Reject` for malformed
+- **Validation** - CompID checks and a session-level `Reject` for malformed
   messages.
-- **Resilience** — automatic reconnect with exponential backoff.
-- **Pluggable persistence** — in-memory by default; `FileStore` for sequence
+- **Resilience** - automatic reconnect with exponential backoff.
+- **Pluggable persistence** - in-memory by default; `FileStore` for sequence
   numbers across restarts, or bring your own `SeqStore` / `MessageStore`.
 
 The session edge cases are the whole point, so they're tested:
@@ -175,7 +175,7 @@ v0.1 ships the 20% that covers most real integrations. Next, in rough order:
 
 ## Contributing
 
-Contributions welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md). The project has
+Contributions welcome - see [CONTRIBUTING.md](./CONTRIBUTING.md). The project has
 zero runtime dependencies and intends to keep it that way. Correctness of the
 session layer is the bar: behaviour changes need a test.
 

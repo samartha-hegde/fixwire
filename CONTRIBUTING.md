@@ -1,6 +1,6 @@
 # Contributing to fixwire
 
-Thanks for your interest — fixwire aims to be the FIX engine TypeScript
+Thanks for your interest - fixwire aims to be the FIX engine TypeScript
 deserves, and that only happens with help from people who run FIX in anger.
 
 ## Ground rules
@@ -19,7 +19,7 @@ deserves, and that only happens with help from people who run FIX in anger.
 git clone https://github.com/samartha-hegde/fixwire.git
 cd fixwire
 npm install
-npm test        # node:test via tsx — no build step needed
+npm test        # node:test via tsx - no build step needed
 npm run demo    # self-contained loopback round-trip
 ```
 
@@ -27,7 +27,7 @@ Node 20+ is required (the test runner uses `node --test`).
 
 ## Before you open a PR
 
-Run the full local gate — CI runs exactly these:
+Run the full local gate - CI runs exactly these:
 
 ```bash
 npm run typecheck

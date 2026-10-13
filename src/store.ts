@@ -57,7 +57,7 @@ export class FileStore implements SeqStore {
         if (Number.isInteger(data.out)) this.out = data.out;
         if (Number.isInteger(data.in)) this.in = data.in;
       } catch {
-        // Corrupt file — start fresh rather than crash.
+        // Corrupt file - start fresh rather than crash.
       }
     }
   }
@@ -112,7 +112,7 @@ export interface MessageStore {
 
 /**
  * In-memory message store. Replays within a process lifetime.
- * ponytail: not persisted — after a restart there is nothing to replay, so the
+ * ponytail: not persisted - after a restart there is nothing to replay, so the
  * session gap-fills instead. Upgrade path: a file/db-backed MessageStore.
  */
 export class MemoryMessageStore implements MessageStore {

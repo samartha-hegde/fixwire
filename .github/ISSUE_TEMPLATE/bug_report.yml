@@ -37,4 +37,4 @@ body:
     id: venue
     attributes:
       label: Counterparty / venue (if relevant)
-      description: Which FIX counterparty, and FIX version — helps reproduce session quirks.
+      description: Which FIX counterparty, and FIX version - helps reproduce session quirks.

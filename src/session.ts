@@ -36,7 +36,7 @@ export interface SessionConfig {
 
 type State = 'disconnected' | 'connecting' | 'logon-sent' | 'active' | 'logout-sent';
 
-/** Session-level (admin) message types — never retransmitted; gap-filled instead. */
+/** Session-level (admin) message types - never retransmitted; gap-filled instead. */
 const ADMIN = new Set<string>([
   MsgType.Heartbeat,
   MsgType.TestRequest,
@@ -226,7 +226,7 @@ export class Session extends EventEmitter {
   }
 
   private sendResendRequest(beginSeq: number): void {
-    // EndSeqNo 0 means "up to infinity" — resend everything from beginSeq.
+    // EndSeqNo 0 means "up to infinity" - resend everything from beginSeq.
     this.sendRaw(MsgType.ResendRequest, [
       [Tag.BeginSeqNo, String(beginSeq)],
       [Tag.EndSeqNo, '0'],
@@ -261,7 +261,7 @@ export class Session extends EventEmitter {
   }
 
   private onMessage(msg: FixMessage): void {
-    // Integrity: a bad checksum means corruption — discard without advancing seq.
+    // Integrity: a bad checksum means corruption - discard without advancing seq.
     if (msg.raw !== undefined && !isChecksumValid(msg.raw)) {
       this.emit('error', new Error(`checksum mismatch, discarding: ${msg.toString()}`));
       return;
@@ -303,7 +303,7 @@ export class Session extends EventEmitter {
         this.disconnect();
         return;
       }
-      this.store.setIn(expected + 1); // in-sequence — advance
+      this.store.setIn(expected + 1); // in-sequence - advance
     }
 
     switch (type) {
@@ -355,7 +355,7 @@ export class Session extends EventEmitter {
   private handleSequenceReset(msg: FixMessage): void {
     // Both GapFill (123=Y) and Reset forms carry NewSeqNo (36); honor it if it
     // advances our expected inbound sequence. ponytail: we never reset backwards,
-    // which rejects malicious/erroneous low resets — the safe default.
+    // which rejects malicious/erroneous low resets - the safe default.
     const newSeq = msg.getInt(Tag.NewSeqNo);
     if (newSeq !== undefined && newSeq > this.store.getNextIn()) {
       this.store.setIn(newSeq);
@@ -379,7 +379,7 @@ export class Session extends EventEmitter {
     for (let seq = begin; seq <= end; seq++) {
       const rec = this.messages.get(seq);
       if (rec && !ADMIN.has(rec.msgType)) {
-        // A real application message — retransmit it with PossDup.
+        // A real application message - retransmit it with PossDup.
         flushGap(seq);
         this.sendRaw(rec.msgType, rec.body, {
           seqNum: seq,
@@ -387,7 +387,7 @@ export class Session extends EventEmitter {
           origSendingTime: rec.sendingTime,
         });
       } else {
-        // Admin message (or not retained) — subsume it into a gap-fill run.
+        // Admin message (or not retained) - subsume it into a gap-fill run.
         if (gapStart === null) gapStart = seq;
       }
     }
@@ -431,7 +431,7 @@ export class Session extends EventEmitter {
         this.sendTestRequest();
       } else if (now - this.lastRecv >= hb * 3) {
         // Drop the socket without marking the close intentional so reconnect fires.
-        this.emit('error', new Error('heartbeat timeout — no response to TestRequest'));
+        this.emit('error', new Error('heartbeat timeout - no response to TestRequest'));
         this.stopTimers();
         this.socket?.destroy();
       }

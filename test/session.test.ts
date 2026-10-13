@@ -228,7 +228,7 @@ test('rejects a message that is missing MsgType', async () => {
 test('logs out on a CompID mismatch', async () => {
   const acc = await startAcceptor((msg, send, sock) => {
     if (msg.msgType === MsgType.Logon) {
-      // Wrong SenderCompID — not who we dialed.
+      // Wrong SenderCompID - not who we dialed.
       sock.write(
         encode([
           [Tag.MsgType, MsgType.Logon],

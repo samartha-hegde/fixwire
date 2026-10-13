@@ -7,7 +7,7 @@
  *   FIX_SENDER=YOURCOMP FIX_TARGET=VENUE FIX_TLS=1 \
  *   npx tsx examples/venue.ts
  *
- * This only logs on, prints inbound messages, and logs out on SIGINT — a safe
+ * This only logs on, prints inbound messages, and logs out on SIGINT - a safe
  * starting point for a new integration. It never sends an order on its own.
  */
 import { Session } from '../src/index.js';
@@ -31,7 +31,7 @@ const session = new Session({
 });
 
 session.on('connect', () => console.log(`connected to ${FIX_HOST}:${FIX_PORT}`));
-session.on('logon', () => console.log('logged on — session active'));
+session.on('logon', () => console.log('logged on - session active'));
 session.on('message', (msg) => console.log('<-', msg.toString()));
 session.on('reconnecting', (attempt, delay) =>
   console.log(`reconnecting (attempt ${attempt}) in ${delay}ms`),

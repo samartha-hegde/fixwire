@@ -15,7 +15,7 @@ Initial public release. FIX 4.4, initiator (client) side.
 - Typed FIX codec: `encode`, `parse`, `checksum`, `isChecksumValid`.
 - Streaming `FixParser` that frames messages by BodyLength across split and
   batched TCP reads.
-- `Session` — initiator state machine:
+- `Session` - initiator state machine:
   - Logon / logout handshake, heartbeats, test request / response.
   - Sequence tracking with gap detection (`ResendRequest`) and
     `SequenceReset` / gap-fill handling.

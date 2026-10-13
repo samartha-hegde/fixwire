@@ -11,7 +11,7 @@ runs `npm publish --provenance --access public`.
 2. Add it as a repository secret named `NPM_TOKEN`
    (Settings → Secrets and variables → Actions → New repository secret).
 
-That's it — provenance uses GitHub OIDC (the `id-token: write` permission in the
+That's it - provenance uses GitHub OIDC (the `id-token: write` permission in the
 workflow), so no extra signing keys are needed.
 
 ## Cutting a release
@@ -22,7 +22,7 @@ workflow), so no extra signing keys are needed.
 3. Bump the version and create the tag:
 
    ```bash
-   npm version patch   # or minor / major — follows semver
+   npm version patch   # or minor / major - follows semver
    git push --follow-tags
    ```
 
