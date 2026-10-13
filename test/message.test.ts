@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { encode, parse, checksum, FixParser, SOH, Tag } from '../src/index.js';
+import { encode, parse, checksum, isChecksumValid, FixParser, SOH, Tag } from '../src/index.js';
+
+test('isChecksumValid accepts a real message and rejects a tampered one', () => {
+  const wire = encode([[35, '0'], [49, 'A'], [56, 'B'], [34, '1']]);
+  assert.ok(isChecksumValid(wire));
+  // Flip the checksum digits — must now be rejected.
+  const tampered = wire.slice(0, -4) + 'XXX' + SOH;
+  assert.equal(isChecksumValid(tampered), false);
+});
 
 test('checksum matches a known FIX vector', () => {
   // Canonical QuickFIX example message; its checksum is 062.

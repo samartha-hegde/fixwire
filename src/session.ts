@@ -1,9 +1,23 @@
 import { EventEmitter } from 'node:events';
 import type { Socket } from 'node:net';
 import { Tag, MsgType } from './constants.js';
-import { FixMessage, FixParser, encode, type Field } from './message.js';
+import { FixMessage, FixParser, encode, isChecksumValid, type Field } from './message.js';
 import { connect as openSocket, type TransportOptions } from './transport.js';
-import { MemoryStore, type SeqStore } from './store.js';
+import {
+  MemoryStore,
+  MemoryMessageStore,
+  type SeqStore,
+  type MessageStore,
+} from './store.js';
+
+export interface ReconnectOptions {
+  /** Delay before the first retry, default 1000ms. */
+  initialDelayMs?: number;
+  /** Ceiling for the exponential backoff, default 30000ms. */
+  maxDelayMs?: number;
+  /** Max consecutive attempts before giving up; omit for unlimited. */
+  maxRetries?: number;
+}
 
 export interface SessionConfig {
   senderCompId: string;
@@ -17,11 +31,26 @@ export interface SessionConfig {
   heartBtInt?: number;
   /** Send ResetSeqNumFlag (141=Y) on logon and reset local counters to 1. */
   resetOnLogon?: boolean;
+  /** Reconnect automatically on unexpected disconnect. `true` uses defaults. */
+  reconnect?: boolean | ReconnectOptions;
   /** Sequence-number store, default in-memory. */
   store?: SeqStore;
+  /** Outbound message store for resend/replay, default in-memory. */
+  messageStore?: MessageStore;
 }
 
 type State = 'disconnected' | 'connecting' | 'logon-sent' | 'active' | 'logout-sent';
+
+/** Session-level (admin) message types — never retransmitted; gap-filled instead. */
+const ADMIN = new Set<string>([
+  MsgType.Heartbeat,
+  MsgType.TestRequest,
+  MsgType.ResendRequest,
+  MsgType.Reject,
+  MsgType.SequenceReset,
+  MsgType.Logout,
+  MsgType.Logon,
+]);
 
 function utcTimestamp(d = new Date()): string {
   const p = (n: number, w = 2) => String(n).padStart(w, '0');
@@ -31,22 +60,48 @@ function utcTimestamp(d = new Date()): string {
   );
 }
 
+/** Typed events emitted by {@link Session}. */
+export interface SessionEvents {
+  connect: [];
+  logon: [msg: FixMessage];
+  logout: [msg: FixMessage];
+  app: [msg: FixMessage];
+  message: [msg: FixMessage];
+  reject: [msg: FixMessage];
+  sent: [wire: string];
+  reconnecting: [attempt: number, delayMs: number];
+  close: [];
+  error: [err: Error];
+}
+
+// Typed EventEmitter surface via declaration merging.
+export interface Session {
+  on<E extends keyof SessionEvents>(event: E, listener: (...args: SessionEvents[E]) => void): this;
+  once<E extends keyof SessionEvents>(event: E, listener: (...args: SessionEvents[E]) => void): this;
+  off<E extends keyof SessionEvents>(event: E, listener: (...args: SessionEvents[E]) => void): this;
+  emit<E extends keyof SessionEvents>(event: E, ...args: SessionEvents[E]): boolean;
+}
+
 /**
  * FIX initiator session. Owns the session state machine: logon, heartbeats,
- * test requests, sequence tracking, gap detection (ResendRequest) and
- * SequenceReset / gap-fill handling.
- *
- * Events: `connect`, `logon`, `logout`, `close`, `error`, `app` (application
- * message), `message` (every inbound message, raw firehose), `sent` (wire string).
+ * test requests, sequence tracking, gap detection (ResendRequest),
+ * SequenceReset / gap-fill handling, inbound validation, and reconnect.
  */
 export class Session extends EventEmitter {
-  private readonly cfg: Required<Omit<SessionConfig, 'tls' | 'store'>> & Pick<SessionConfig, 'tls'>;
+  private readonly cfg: Required<Omit<SessionConfig, 'tls' | 'store' | 'messageStore' | 'reconnect'>> &
+    Pick<SessionConfig, 'tls'>;
+  private readonly reconnectCfg: ReconnectOptions | null;
   private readonly store: SeqStore;
-  private readonly parser = new FixParser();
+  private readonly messages: MessageStore;
+  private parser = new FixParser();
   private socket?: Socket;
   private state: State = 'disconnected';
 
   private timer?: ReturnType<typeof setInterval>;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
+  private reconnectAttempts = 0;
+  private intentionalClose = false;
+
   private lastSent = 0;
   private lastRecv = 0;
   private testReqOutstanding = false;
@@ -64,12 +119,25 @@ export class Session extends EventEmitter {
       heartBtInt: config.heartBtInt ?? 30,
       resetOnLogon: config.resetOnLogon ?? false,
     };
+    this.reconnectCfg = config.reconnect
+      ? typeof config.reconnect === 'object'
+        ? config.reconnect
+        : {}
+      : null;
     this.store = config.store ?? new MemoryStore();
+    this.messages = config.messageStore ?? new MemoryMessageStore();
+  }
+
+  /** Current session state. */
+  get status(): State {
+    return this.state;
   }
 
   /** Open the socket and begin the logon handshake. */
   connect(): void {
+    this.intentionalClose = false;
     this.state = 'connecting';
+    this.parser = new FixParser();
     const socket = openSocket({ host: this.cfg.host, port: this.cfg.port, tls: this.cfg.tls });
     this.socket = socket;
 
@@ -81,11 +149,7 @@ export class Session extends EventEmitter {
     socket.once(this.cfg.tls ? 'secureConnect' : 'connect', ready);
     socket.on('data', (chunk: Buffer) => this.onData(chunk.toString('latin1')));
     socket.on('error', (err) => this.emit('error', err));
-    socket.on('close', () => {
-      this.stopTimers();
-      this.state = 'disconnected';
-      this.emit('close');
-    });
+    socket.on('close', () => this.onClose());
   }
 
   /** Send an application message. Throws if the session is not active. */
@@ -94,13 +158,16 @@ export class Session extends EventEmitter {
     this.sendRaw(msgType, fields);
   }
 
-  /** Initiate a graceful logout. */
+  /** Initiate a graceful logout. Suppresses auto-reconnect. */
   logout(text?: string): void {
+    this.intentionalClose = true;
     this.sendLogout(text);
   }
 
-  /** Tear the socket down immediately. */
+  /** Tear the socket down immediately. Suppresses auto-reconnect. */
   disconnect(): void {
+    this.intentionalClose = true;
+    this.clearReconnect();
     this.stopTimers();
     this.socket?.destroy();
     this.state = 'disconnected';
@@ -111,20 +178,27 @@ export class Session extends EventEmitter {
   private sendRaw(
     msgType: string,
     body: Field[] = [],
-    opts: { seqNum?: number; possDup?: boolean } = {},
+    opts: { seqNum?: number; possDup?: boolean; origSendingTime?: string } = {},
   ): void {
+    const explicit = opts.seqNum !== undefined;
     const seq = opts.seqNum ?? this.store.incrOut();
+    const ts = utcTimestamp();
     const header: Field[] = [
       [Tag.MsgType, msgType],
       [Tag.MsgSeqNum, String(seq)],
       [Tag.SenderCompID, this.cfg.senderCompId],
       [Tag.TargetCompID, this.cfg.targetCompId],
-      [Tag.SendingTime, utcTimestamp()],
+      [Tag.SendingTime, ts],
     ];
-    if (opts.possDup) header.push([Tag.PossDupFlag, 'Y']);
+    if (opts.possDup) {
+      header.push([Tag.PossDupFlag, 'Y']);
+      header.push([Tag.OrigSendingTime, opts.origSendingTime ?? ts]);
+    }
     const wire = encode([...header, ...body], this.cfg.beginString);
     this.socket?.write(wire, 'latin1');
     this.lastSent = Date.now();
+    // Retain fresh (non-replay) sends so we can answer a ResendRequest later.
+    if (!explicit) this.messages.put({ seq, msgType, body, sendingTime: ts });
     this.emit('sent', wire);
   }
 
@@ -135,6 +209,7 @@ export class Session extends EventEmitter {
     ];
     if (this.cfg.resetOnLogon) {
       this.store.reset();
+      this.messages.reset();
       body.push([Tag.ResetSeqNumFlag, 'Y']);
     }
     this.state = 'logon-sent';
@@ -158,6 +233,13 @@ export class Session extends EventEmitter {
     ]);
   }
 
+  private sendReject(refSeqNum: number | undefined, text: string): void {
+    const body: Field[] = [];
+    if (refSeqNum !== undefined) body.push([Tag.RefSeqNum, String(refSeqNum)]);
+    body.push([Tag.Text, text]);
+    this.sendRaw(MsgType.Reject, body);
+  }
+
   private sendLogout(text?: string): void {
     this.state = 'logout-sent';
     this.sendRaw(MsgType.Logout, text ? [[Tag.Text, text]] : []);
@@ -172,16 +254,34 @@ export class Session extends EventEmitter {
     try {
       messages = this.parser.append(chunk);
     } catch (err) {
-      this.emit('error', err);
+      this.emit('error', err as Error);
       return;
     }
     for (const msg of messages) this.onMessage(msg);
   }
 
   private onMessage(msg: FixMessage): void {
+    // Integrity: a bad checksum means corruption — discard without advancing seq.
+    if (msg.raw !== undefined && !isChecksumValid(msg.raw)) {
+      this.emit('error', new Error(`checksum mismatch, discarding: ${msg.toString()}`));
+      return;
+    }
+
     this.emit('message', msg);
     const type = msg.msgType;
     const seq = msg.seqNum;
+
+    if (type === undefined) {
+      this.sendReject(seq, 'missing MsgType (35)');
+      return;
+    }
+
+    // Identity: the counterparty's comp IDs must mirror ours.
+    if (!this.compIdsMatch(msg)) {
+      this.sendLogout('CompID mismatch');
+      this.disconnect();
+      return;
+    }
 
     // SequenceReset may legitimately jump the sequence; handle before the gap check.
     if (type === MsgType.SequenceReset) {
@@ -200,6 +300,7 @@ export class Session extends EventEmitter {
       if (seq < expected) {
         if (msg.get(Tag.PossDupFlag) === 'Y') return; // already processed, ignore
         this.sendLogout(`MsgSeqNum too low, expecting ${expected} but received ${seq}`);
+        this.disconnect();
         return;
       }
       this.store.setIn(expected + 1); // in-sequence — advance
@@ -229,14 +330,24 @@ export class Session extends EventEmitter {
     }
   }
 
+  private compIdsMatch(msg: FixMessage): boolean {
+    const sender = msg.get(Tag.SenderCompID);
+    const target = msg.get(Tag.TargetCompID);
+    if (sender !== undefined && sender !== this.cfg.targetCompId) return false;
+    if (target !== undefined && target !== this.cfg.senderCompId) return false;
+    return true;
+  }
+
   private onLogon(msg: FixMessage): void {
     this.state = 'active';
+    this.reconnectAttempts = 0;
     this.startTimers();
     this.emit('logon', msg);
   }
 
   private onLogout(msg: FixMessage): void {
     if (this.state !== 'logout-sent') this.sendRaw(MsgType.Logout, []); // reply before closing
+    this.intentionalClose = true; // a clean logout should not trigger reconnect
     this.emit('logout', msg);
     this.disconnect();
   }
@@ -252,18 +363,45 @@ export class Session extends EventEmitter {
   }
 
   private handleResendRequest(msg: FixMessage): void {
-    // ponytail: v0 keeps no outbound message store, so we honestly gap-fill the
-    // requested range instead of replaying. Upgrade path: persist sent app
-    // messages and replay them (with PossDup) when a true resend is needed.
     const begin = msg.getInt(Tag.BeginSeqNo) ?? 1;
-    const newSeq = this.store.getNextOut();
+    const endReq = msg.getInt(Tag.EndSeqNo) ?? 0;
+    const last = this.store.getNextOut() - 1;
+    const end = endReq === 0 || endReq > last ? last : endReq;
+
+    let gapStart: number | null = null;
+    const flushGap = (upTo: number) => {
+      if (gapStart !== null) {
+        this.sendGapFill(gapStart, upTo);
+        gapStart = null;
+      }
+    };
+
+    for (let seq = begin; seq <= end; seq++) {
+      const rec = this.messages.get(seq);
+      if (rec && !ADMIN.has(rec.msgType)) {
+        // A real application message — retransmit it with PossDup.
+        flushGap(seq);
+        this.sendRaw(rec.msgType, rec.body, {
+          seqNum: seq,
+          possDup: true,
+          origSendingTime: rec.sendingTime,
+        });
+      } else {
+        // Admin message (or not retained) — subsume it into a gap-fill run.
+        if (gapStart === null) gapStart = seq;
+      }
+    }
+    flushGap(end + 1);
+  }
+
+  private sendGapFill(fromSeq: number, newSeqNo: number): void {
     this.sendRaw(
       MsgType.SequenceReset,
       [
         [Tag.GapFillFlag, 'Y'],
-        [Tag.NewSeqNo, String(newSeq)],
+        [Tag.NewSeqNo, String(newSeqNo)],
       ],
-      { seqNum: begin, possDup: true },
+      { seqNum: fromSeq, possDup: true },
     );
   }
 
@@ -292,9 +430,45 @@ export class Session extends EventEmitter {
         this.testReqOutstanding = true;
         this.sendTestRequest();
       } else if (now - this.lastRecv >= hb * 3) {
+        // Drop the socket without marking the close intentional so reconnect fires.
         this.emit('error', new Error('heartbeat timeout — no response to TestRequest'));
-        this.disconnect();
+        this.stopTimers();
+        this.socket?.destroy();
       }
+    }
+  }
+
+  // --- reconnect --------------------------------------------------------------
+
+  private onClose(): void {
+    this.stopTimers();
+    const wasActive = this.state !== 'disconnected';
+    this.state = 'disconnected';
+    this.emit('close');
+    if (wasActive) this.maybeReconnect();
+  }
+
+  private maybeReconnect(): void {
+    if (!this.reconnectCfg || this.intentionalClose) return;
+    const { initialDelayMs = 1000, maxDelayMs = 30_000, maxRetries } = this.reconnectCfg;
+    if (maxRetries !== undefined && this.reconnectAttempts >= maxRetries) {
+      this.emit('error', new Error(`reconnect gave up after ${maxRetries} attempts`));
+      return;
+    }
+    const attempt = ++this.reconnectAttempts;
+    const delay = Math.min(maxDelayMs, initialDelayMs * 2 ** (attempt - 1));
+    this.emit('reconnecting', attempt, delay);
+    this.clearReconnect();
+    this.reconnectTimer = setTimeout(() => {
+      if (!this.intentionalClose) this.connect();
+    }, delay);
+    this.reconnectTimer.unref?.();
+  }
+
+  private clearReconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
     }
   }
 }

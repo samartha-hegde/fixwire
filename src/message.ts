@@ -6,10 +6,13 @@ export type Field = [number, string];
 /** A parsed FIX message. Preserves field order and repeats; `get` returns the first occurrence. */
 export class FixMessage {
   readonly fields: Field[];
+  /** The raw wire string this was parsed from, when available. */
+  readonly raw?: string;
   private readonly index: Map<number, string>;
 
-  constructor(fields: Field[] = []) {
+  constructor(fields: Field[] = [], raw?: string) {
     this.fields = fields;
+    this.raw = raw;
     this.index = new Map();
     for (const [tag, val] of fields) {
       if (!this.index.has(tag)) this.index.set(tag, val);
@@ -68,10 +71,21 @@ export function parse(raw: string): FixMessage {
     if (eq === -1) continue;
     fields.push([Number(part.slice(0, eq)), part.slice(eq + 1)]);
   }
-  return new FixMessage(fields);
+  return new FixMessage(fields, raw);
 }
 
 const CHECKSUM_FIELD_LEN = '10=000\x01'.length; // "10=" + 3 digits + SOH
+
+/**
+ * Verify the trailing CheckSum (tag 10) of a complete raw FIX message.
+ * Assumes standard framing: the message ends with `10=NNN<SOH>`.
+ */
+export function isChecksumValid(raw: string): boolean {
+  if (raw.length < CHECKSUM_FIELD_LEN) return false;
+  const body = raw.slice(0, raw.length - CHECKSUM_FIELD_LEN);
+  const declared = raw.slice(raw.length - 4, raw.length - 1);
+  return checksum(body) === declared;
+}
 
 /**
  * Streaming parser. TCP delivers partial/batched messages; feed raw chunks via

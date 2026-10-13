@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import type { Field } from './message.js';
 
 /**
  * Sequence-number store. FIX requires monotonic, gap-detected sequence numbers
@@ -58,4 +59,34 @@ export class FileStore implements SeqStore {
   setOut(n: number): void { this.out = n; this.flush(); }
   setIn(n: number): void { this.in = n; this.flush(); }
   reset(): void { this.out = 1; this.in = 1; this.flush(); }
+}
+
+/** A sent message retained so it can be retransmitted on a ResendRequest. */
+export interface StoredMessage {
+  seq: number;
+  msgType: string;
+  body: Field[];
+  sendingTime: string;
+}
+
+/**
+ * Store of outbound messages, keyed by sequence number, used to answer
+ * ResendRequests by replaying application messages (with PossDup).
+ */
+export interface MessageStore {
+  put(msg: StoredMessage): void;
+  get(seq: number): StoredMessage | undefined;
+  reset(): void;
+}
+
+/**
+ * In-memory message store. Replays within a process lifetime.
+ * ponytail: not persisted — after a restart there is nothing to replay, so the
+ * session gap-fills instead. Upgrade path: a file/db-backed MessageStore.
+ */
+export class MemoryMessageStore implements MessageStore {
+  private readonly map = new Map<number, StoredMessage>();
+  put(msg: StoredMessage): void { this.map.set(msg.seq, msg); }
+  get(seq: number): StoredMessage | undefined { return this.map.get(seq); }
+  reset(): void { this.map.clear(); }
 }
