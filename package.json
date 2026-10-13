@@ -1,0 +1,48 @@
+{
+  "name": "fixwire",
+  "version": "0.0.1",
+  "description": "A modern, fully-typed FIX protocol engine for TypeScript — correct session layer, great DX.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Samartha Hegde",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samartha-hegde/fixwire.git"
+  },
+  "keywords": [
+    "fix",
+    "fix-protocol",
+    "fix44",
+    "trading",
+    "quickfix",
+    "financial",
+    "fintech"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "demo": "node --import tsx examples/demo.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}
