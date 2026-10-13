@@ -24,8 +24,11 @@ test('newOrderSingle builds the expected fields', () => {
 
 test('newOrderSingle omits price for market orders', () => {
   const fields = newOrderSingle({
-    clOrdId: 'o-2', symbol: 'ETH/USD', side: Side.Sell,
-    orderQty: 2, ordType: OrdType.Market,
+    clOrdId: 'o-2',
+    symbol: 'ETH/USD',
+    side: Side.Sell,
+    orderQty: 2,
+    ordType: OrdType.Market,
   });
   assert.equal(new Map(fields).has(Tag.Price), false);
 });

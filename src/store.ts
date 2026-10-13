@@ -22,12 +22,25 @@ export interface SeqStore {
 export class MemoryStore implements SeqStore {
   private out = 1;
   private in = 1;
-  getNextOut(): number { return this.out; }
-  getNextIn(): number { return this.in; }
-  incrOut(): number { return this.out++; }
-  setOut(n: number): void { this.out = n; }
-  setIn(n: number): void { this.in = n; }
-  reset(): void { this.out = 1; this.in = 1; }
+  getNextOut(): number {
+    return this.out;
+  }
+  getNextIn(): number {
+    return this.in;
+  }
+  incrOut(): number {
+    return this.out++;
+  }
+  setOut(n: number): void {
+    this.out = n;
+  }
+  setIn(n: number): void {
+    this.in = n;
+  }
+  reset(): void {
+    this.out = 1;
+    this.in = 1;
+  }
 }
 
 /** File-backed store. Persists seq numbers across restarts so recovery works. */
@@ -53,12 +66,30 @@ export class FileStore implements SeqStore {
     writeFileSync(this.path, JSON.stringify({ out: this.out, in: this.in }));
   }
 
-  getNextOut(): number { return this.out; }
-  getNextIn(): number { return this.in; }
-  incrOut(): number { const v = this.out++; this.flush(); return v; }
-  setOut(n: number): void { this.out = n; this.flush(); }
-  setIn(n: number): void { this.in = n; this.flush(); }
-  reset(): void { this.out = 1; this.in = 1; this.flush(); }
+  getNextOut(): number {
+    return this.out;
+  }
+  getNextIn(): number {
+    return this.in;
+  }
+  incrOut(): number {
+    const v = this.out++;
+    this.flush();
+    return v;
+  }
+  setOut(n: number): void {
+    this.out = n;
+    this.flush();
+  }
+  setIn(n: number): void {
+    this.in = n;
+    this.flush();
+  }
+  reset(): void {
+    this.out = 1;
+    this.in = 1;
+    this.flush();
+  }
 }
 
 /** A sent message retained so it can be retransmitted on a ResendRequest. */
@@ -86,7 +117,13 @@ export interface MessageStore {
  */
 export class MemoryMessageStore implements MessageStore {
   private readonly map = new Map<number, StoredMessage>();
-  put(msg: StoredMessage): void { this.map.set(msg.seq, msg); }
-  get(seq: number): StoredMessage | undefined { return this.map.get(seq); }
-  reset(): void { this.map.clear(); }
+  put(msg: StoredMessage): void {
+    this.map.set(msg.seq, msg);
+  }
+  get(seq: number): StoredMessage | undefined {
+    return this.map.get(seq);
+  }
+  reset(): void {
+    this.map.clear();
+  }
 }

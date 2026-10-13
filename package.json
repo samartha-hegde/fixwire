@@ -1,6 +1,6 @@
 {
   "name": "fixwire",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A modern, fully-typed FIX protocol engine for TypeScript — correct session layer, great DX.",
   "type": "module",
   "license": "MIT",
@@ -26,23 +26,36 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=20"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "node --import tsx --test test/*.test.ts",
-    "demo": "node --import tsx examples/demo.ts"
+    "demo": "node --import tsx examples/demo.ts",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
+    "@eslint/js": "^9",
     "@types/node": "^22",
+    "eslint": "^9",
+    "prettier": "^3",
     "tsx": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8"
   }
 }

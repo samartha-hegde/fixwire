@@ -3,12 +3,7 @@ import type { Socket } from 'node:net';
 import { Tag, MsgType } from './constants.js';
 import { FixMessage, FixParser, encode, isChecksumValid, type Field } from './message.js';
 import { connect as openSocket, type TransportOptions } from './transport.js';
-import {
-  MemoryStore,
-  MemoryMessageStore,
-  type SeqStore,
-  type MessageStore,
-} from './store.js';
+import { MemoryStore, MemoryMessageStore, type SeqStore, type MessageStore } from './store.js';
 
 export interface ReconnectOptions {
   /** Delay before the first retry, default 1000ms. */
@@ -77,7 +72,10 @@ export interface SessionEvents {
 // Typed EventEmitter surface via declaration merging.
 export interface Session {
   on<E extends keyof SessionEvents>(event: E, listener: (...args: SessionEvents[E]) => void): this;
-  once<E extends keyof SessionEvents>(event: E, listener: (...args: SessionEvents[E]) => void): this;
+  once<E extends keyof SessionEvents>(
+    event: E,
+    listener: (...args: SessionEvents[E]) => void,
+  ): this;
   off<E extends keyof SessionEvents>(event: E, listener: (...args: SessionEvents[E]) => void): this;
   emit<E extends keyof SessionEvents>(event: E, ...args: SessionEvents[E]): boolean;
 }
@@ -88,7 +86,9 @@ export interface Session {
  * SequenceReset / gap-fill handling, inbound validation, and reconnect.
  */
 export class Session extends EventEmitter {
-  private readonly cfg: Required<Omit<SessionConfig, 'tls' | 'store' | 'messageStore' | 'reconnect'>> &
+  private readonly cfg: Required<
+    Omit<SessionConfig, 'tls' | 'store' | 'messageStore' | 'reconnect'>
+  > &
     Pick<SessionConfig, 'tls'>;
   private readonly reconnectCfg: ReconnectOptions | null;
   private readonly store: SeqStore;

@@ -15,8 +15,10 @@ const server = net.createServer((sock) => {
   let out = 1;
   const send = (type: string, fields: Field[] = []) => {
     const header: Field[] = [
-      [Tag.MsgType, type], [Tag.MsgSeqNum, String(out++)],
-      [Tag.SenderCompID, 'ACCEPTOR'], [Tag.TargetCompID, 'CLIENT'],
+      [Tag.MsgType, type],
+      [Tag.MsgSeqNum, String(out++)],
+      [Tag.SenderCompID, 'ACCEPTOR'],
+      [Tag.TargetCompID, 'CLIENT'],
       [Tag.SendingTime, '20240101-00:00:00.000'],
     ];
     sock.write(encode([...header, ...fields]), 'latin1');
@@ -24,11 +26,15 @@ const server = net.createServer((sock) => {
   sock.on('data', (chunk: string) => {
     for (const msg of parser.append(chunk)) {
       if (msg.msgType === MsgType.Logon) {
-        send(MsgType.Logon, [[Tag.EncryptMethod, '0'], [Tag.HeartBtInt, '30']]);
+        send(MsgType.Logon, [
+          [Tag.EncryptMethod, '0'],
+          [Tag.HeartBtInt, '30'],
+        ]);
       } else if (msg.msgType === MsgType.NewOrderSingle) {
         send(MsgType.ExecutionReport, [
           [Tag.ClOrdID, msg.get(Tag.ClOrdID) ?? ''],
-          [Tag.ExecType, '0'], [Tag.OrdStatus, '0'],
+          [Tag.ExecType, '0'],
+          [Tag.OrdStatus, '0'],
           [Tag.Symbol, msg.get(Tag.Symbol) ?? ''],
         ]);
       } else if (msg.msgType === MsgType.Logout) {
@@ -65,14 +71,22 @@ server.listen(0, '127.0.0.1', () => {
 
   session.on('app', (msg) => {
     if (msg.msgType === MsgType.ExecutionReport) {
-      console.log(`✓ ExecutionReport: ${msg.get(Tag.ClOrdID)} status=${msg.get(Tag.OrdStatus)} symbol=${msg.get(Tag.Symbol)}`);
+      console.log(
+        `✓ ExecutionReport: ${msg.get(Tag.ClOrdID)} status=${msg.get(Tag.OrdStatus)} symbol=${msg.get(Tag.Symbol)}`,
+      );
       session.logout();
     }
   });
 
   session.on('logout', () => console.log('← logout acknowledged'));
-  session.on('close', () => { server.close(); console.log('✓ done'); });
-  session.on('error', (err) => { console.error('session error:', err); process.exit(1); });
+  session.on('close', () => {
+    server.close();
+    console.log('✓ done');
+  });
+  session.on('error', (err) => {
+    console.error('session error:', err);
+    process.exit(1);
+  });
 
   session.connect();
 });

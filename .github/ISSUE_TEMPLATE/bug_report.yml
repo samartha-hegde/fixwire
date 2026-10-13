@@ -1,0 +1,40 @@
+name: Bug report
+description: Something isn't working as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: >
+        Minimal steps or code. A failing test against the in-process acceptor
+        harness in `test/session.test.ts` is ideal.
+      render: typescript
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: fixwire version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      placeholder: v20.x
+    validations:
+      required: true
+  - type: input
+    id: venue
+    attributes:
+      label: Counterparty / venue (if relevant)
+      description: Which FIX counterparty, and FIX version — helps reproduce session quirks.
