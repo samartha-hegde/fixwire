@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>fixwire · FIX protocol engine for TypeScript</title>
+<meta name="description" content="A modern, fully-typed FIX protocol engine for TypeScript. Zero dependencies, a correct session layer, initiator and acceptor, FIX 4.2 through 5.0." />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#100e0a" />
+<link rel="canonical" href="https://samartha-hegde.github.io/fixwire/" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="fixwire · FIX protocol engine for TypeScript" />
+<meta property="og:description" content="A correct session layer, zero dependencies, and an API that feels like 2026. Initiator and acceptor, FIX 4.2 through 5.0." />
+<meta property="og:url" content="https://samartha-hegde.github.io/fixwire/" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="fixwire · FIX protocol engine for TypeScript" />
+<meta name="twitter:description" content="A correct session layer, zero dependencies, and an API that feels like 2026." />
+</head>
+<body>
+<style>
+  :root {
+    --ground: #100e0a;
+    --ground-2: #15120c;
+    --panel: #1b1710;
+    --panel-2: #211c13;
+    --ink: #f3eee2;
+    --muted: #a99e88;
+    --faint: #6f6650;
+    --line: rgba(243, 238, 226, 0.09);
+    --line-strong: rgba(243, 238, 226, 0.16);
+    --amber: #f5a623;
+    --amber-bright: #ffbe4d;
+    --amber-dim: #c98a2a;
+    --pass: #5bd38a;
+    --radius: 14px;
+    --maxw: 1140px;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1100px 620px at 78% -8%, rgba(245, 166, 35, 0.10), transparent 60%),
+      radial-gradient(900px 500px at 5% 4%, rgba(245, 166, 35, 0.045), transparent 55%),
+      var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  a { color: inherit; text-decoration: none; }
+
+  ::selection { background: rgba(245, 166, 35, 0.28); color: #fff; }
+
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 4px; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin: 0 0 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 26px;
+    height: 1px;
+    background: var(--amber-dim);
+  }
+
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  /* ---------- nav ---------- */
+  header.nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(12px);
+    background: linear-gradient(var(--ground), rgba(16, 14, 10, 0.72));
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+  }
+  .brand {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 1.02rem;
+    letter-spacing: -0.01em;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .brand .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.16);
+  }
+  .brand b { color: var(--amber); font-weight: 700; }
+  .nav-links { display: flex; align-items: center; gap: 26px; font-size: 0.93rem; }
+  .nav-links a { color: var(--muted); transition: color 0.18s; }
+  .nav-links a:hover { color: var(--ink); }
+  .nav-cta {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
+    padding: 8px 14px;
+    border-radius: 9px;
+    background: var(--panel);
+    transition: border-color 0.18s, background 0.18s;
+  }
+  .nav-cta:hover { border-color: var(--amber-dim); background: var(--panel-2); }
+  .nav-links .hide-sm { display: inline; }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 88px 0 64px; }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 56px;
+    align-items: center;
+  }
+  h1.hero-title {
+    font-size: clamp(2.5rem, 5.6vw, 4.1rem);
+    font-weight: 820;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+  }
+  h1.hero-title .accent { color: var(--amber); }
+  .hero-sub {
+    color: var(--muted);
+    font-size: 1.12rem;
+    margin: 22px 0 0;
+    max-width: 34ch;
+  }
+  .hero-sub b { color: var(--ink); font-weight: 600; }
+
+  .install {
+    margin-top: 32px;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    max-width: 360px;
+    border: 1px solid var(--line-strong);
+    border-radius: 11px;
+    background: var(--panel);
+    overflow: hidden;
+  }
+  .install code {
+    font-family: var(--mono);
+    font-size: 0.92rem;
+    padding: 13px 16px;
+    flex: 1;
+    color: var(--ink);
+  }
+  .install code .pr { color: var(--amber); }
+  .copy-btn {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    border: none;
+    border-left: 1px solid var(--line-strong);
+    background: var(--panel-2);
+    color: var(--muted);
+    padding: 0 16px;
+    cursor: pointer;
+    transition: color 0.18s, background 0.18s;
+  }
+  .copy-btn:hover { color: var(--amber); background: #26200f; }
+  .copy-btn.ok { color: var(--pass); }
+
+  .hero-ctas { margin-top: 26px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .btn {
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 12px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.18s, background 0.18s, border-color 0.18s;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .btn-primary {
+    background: var(--amber);
+    color: #1a1304;
+    border: 1px solid var(--amber);
+    box-shadow: 0 8px 28px -10px rgba(245, 166, 35, 0.6);
+  }
+  .btn-primary:hover { background: var(--amber-bright); transform: translateY(-1px); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
+  }
+  .btn-ghost:hover { border-color: var(--amber-dim); transform: translateY(-1px); }
+
+  /* ---------- terminal panel ---------- */
+  .term {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+  }
+  .term-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(0, 0, 0, 0.2);
+  }
+  .term-bar .tl { width: 11px; height: 11px; border-radius: 50%; background: #3a342a; }
+  .term-bar .label {
+    margin-left: 8px;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--faint);
+    letter-spacing: 0.04em;
+  }
+  .term-body {
+    padding: 18px 18px 20px;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    overflow-x: auto;
+  }
+  .wire-line {
+    display: grid;
+    grid-template-columns: 18px 128px 1fr;
+    gap: 10px;
+    padding: 5px 0;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateY(6px);
+    animation: wirein 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  }
+  @keyframes wirein { to { opacity: 1; transform: none; } }
+  .wire-line .dir { color: var(--faint); text-align: center; }
+  .wire-line .dir.out { color: var(--amber); }
+  .wire-line .dir.in { color: #7fb2d8; }
+  .wire-line .msg { color: var(--ink); font-weight: 600; }
+  .wire-line .raw { color: var(--faint); }
+  .wire-line .raw .t { color: var(--amber-dim); }
+  .wire-line .raw .v { color: var(--muted); }
+  .wire-line .raw .s { color: #3a342a; }
+  .wire-line.done {
+    grid-template-columns: 18px 1fr;
+    color: var(--pass);
+    padding-top: 10px;
+  }
+  .wire-line.done .dir { color: var(--pass); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wire-line { opacity: 1; transform: none; animation: none; }
+    .reveal { opacity: 1 !important; transform: none !important; }
+  }
+
+  /* ---------- stats ---------- */
+  .stats {
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    margin-top: 72px;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    text-align: center;
+  }
+  .stat { padding: 26px 10px; border-right: 1px solid var(--line); }
+  .stat:last-child { border-right: none; }
+  .stat .n {
+    font-family: var(--mono);
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: var(--amber);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .stat .l {
+    font-size: 0.74rem;
+    color: var(--muted);
+    margin-top: 6px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ---------- sections ---------- */
+  section { padding: 96px 0; }
+  .sec-head { max-width: 60ch; margin-bottom: 48px; }
+  h2.sec-title {
+    font-size: clamp(1.7rem, 3.4vw, 2.3rem);
+    font-weight: 760;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+  }
+  .sec-head p { color: var(--muted); margin: 16px 0 0; font-size: 1.06rem; }
+
+  .why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .card {
+    background: linear-gradient(180deg, var(--panel), var(--ground-2));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 28px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .card:hover { border-color: var(--line-strong); transform: translateY(-3px); }
+  .card .k {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 16px;
+  }
+  .card h3 { font-size: 1.22rem; font-weight: 700; letter-spacing: -0.01em; }
+  .card p { color: var(--muted); margin: 12px 0 0; font-size: 0.98rem; line-height: 1.6; }
+
+  /* ---------- code showcase ---------- */
+  .code-shell {
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--panel);
+  }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); background: rgba(0, 0, 0, 0.22); }
+  .tab {
+    font-family: var(--mono);
+    font-size: 0.84rem;
+    color: var(--muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 14px 22px;
+    cursor: pointer;
+    transition: color 0.18s, border-color 0.18s;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--amber); border-bottom-color: var(--amber); }
+  .panel-code { display: none; }
+  .panel-code.active { display: block; }
+  pre {
+    margin: 0;
+    padding: 24px 26px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    line-height: 1.7;
+    tab-size: 2;
+  }
+  pre code { font-family: inherit; }
+  .tok-com { color: var(--faint); font-style: italic; }
+  .tok-str { color: #9fd59a; }
+  .tok-key { color: var(--amber); }
+  .tok-num { color: #e0a0d0; }
+  .tok-type { color: #e8dcc0; }
+
+  /* ---------- features ---------- */
+  .feat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .feat {
+    background: var(--ground-2);
+    padding: 26px 22px;
+    transition: background 0.2s;
+  }
+  .feat:hover { background: var(--panel); }
+  .feat .fk { font-family: var(--mono); font-size: 0.78rem; color: var(--amber); letter-spacing: 0.02em; }
+  .feat h3 { font-size: 1.04rem; font-weight: 650; margin-top: 10px; letter-spacing: -0.01em; }
+  .feat p { color: var(--muted); font-size: 0.9rem; margin: 8px 0 0; line-height: 1.55; }
+
+  /* ---------- correctness ---------- */
+  .proof-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 44px; align-items: center; }
+  .test-term {
+    background: #0c0a07;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    font-family: var(--mono);
+    font-size: 0.83rem;
+    line-height: 1.85;
+    overflow-x: auto;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+  .test-term .cmd { color: var(--muted); }
+  .test-term .cmd .pr { color: var(--amber); }
+  .test-term .pass { color: var(--ink); white-space: nowrap; }
+  .test-term .pass::before { content: "\2713"; color: var(--pass); margin-right: 10px; }
+  .test-term .summ { color: var(--pass); margin-top: 12px; display: block; }
+  .test-term .muted { color: var(--faint); }
+
+  /* ---------- cta / footer ---------- */
+  .cta-band {
+    border: 1px solid var(--line-strong);
+    border-radius: 18px;
+    padding: 56px 40px;
+    text-align: center;
+    background:
+      radial-gradient(600px 300px at 50% -40%, rgba(245, 166, 35, 0.14), transparent 70%),
+      linear-gradient(180deg, var(--panel-2), var(--ground-2));
+  }
+  .cta-band h2 { font-size: clamp(1.7rem, 3.5vw, 2.5rem); font-weight: 780; letter-spacing: -0.03em; }
+  .cta-band p { color: var(--muted); margin: 14px auto 28px; max-width: 48ch; }
+  .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    margin-top: 40px;
+    padding: 40px 0 64px;
+  }
+  .foot-inner { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .foot-brand { font-family: var(--mono); font-weight: 700; }
+  .foot-brand b { color: var(--amber); }
+  .foot-links { display: flex; gap: 24px; font-size: 0.9rem; color: var(--muted); }
+  .foot-links a:hover { color: var(--ink); }
+  .foot-note { color: var(--faint); font-size: 0.82rem; font-family: var(--mono); }
+
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 920px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+    .hero-sub { max-width: none; }
+    .stats-grid { grid-template-columns: repeat(3, 1fr); }
+    .stat:nth-child(3) { border-right: none; }
+    .stat:nth-child(n+4) { border-top: 1px solid var(--line); }
+    .why-grid { grid-template-columns: 1fr; }
+    .feat-grid { grid-template-columns: repeat(2, 1fr); }
+    .proof-grid { grid-template-columns: 1fr; gap: 28px; }
+  }
+  @media (max-width: 560px) {
+    body { font-size: 16px; }
+    .nav-links .hide-sm { display: none; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .stat { border-right: 1px solid var(--line); }
+    .stat:nth-child(2n) { border-right: none; }
+    .stat:nth-child(n+3) { border-top: 1px solid var(--line); }
+    .feat-grid { grid-template-columns: 1fr; }
+    section { padding: 72px 0; }
+  }
+</style>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top"><span class="dot"></span>fix<b>wire</b></a>
+    <nav class="nav-links">
+      <a href="#why" class="hide-sm">Why</a>
+      <a href="#code" class="hide-sm">Code</a>
+      <a href="#features" class="hide-sm">Features</a>
+      <a href="https://github.com/samartha-hegde/fixwire">GitHub</a>
+      <a class="nav-cta" href="https://github.com/samartha-hegde/fixwire">npm i fixwire</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">FIX protocol engine for TypeScript</p>
+        <h1 class="hero-title">The FIX engine<br />TypeScript <span class="accent">deserves.</span></h1>
+        <p class="hero-sub">
+          A correct session layer, <b>zero dependencies</b>, and an API that feels like 2026.
+          The resend, gap-fill, and sequence-reset edge cases handled, not the ones that
+          quietly break lesser engines at 3am.
+        </p>
+
+        <div class="install">
+          <code><span class="pr">$</span> npm install fixwire</code>
+          <button class="copy-btn" data-copy="npm install fixwire">Copy</button>
+        </div>
+
+        <div class="hero-ctas">
+          <a class="btn btn-primary" href="https://github.com/samartha-hegde/fixwire">
+            View on GitHub
+          </a>
+          <a class="btn btn-ghost" href="#code">See the code</a>
+        </div>
+      </div>
+
+      <div class="term" aria-hidden="true">
+        <div class="term-bar">
+          <span class="tl"></span><span class="tl"></span><span class="tl"></span>
+          <span class="label">fixwire session · FIX.4.4</span>
+        </div>
+        <div class="term-body" id="wire">
+          <div class="wire-line"><span class="dir out">&#8594;</span><span class="msg">Logon</span><span class="raw"><span class="t">8</span>=FIX.4.4<span class="s">|</span><span class="t">35</span>=A<span class="s">|</span><span class="t">34</span>=1<span class="s">|</span><span class="t">49</span>=<span class="v">CLIENT</span><span class="s">|</span><span class="t">108</span>=30</span></div>
+          <div class="wire-line"><span class="dir in">&#8592;</span><span class="msg">Logon</span><span class="raw"><span class="t">8</span>=FIX.4.4<span class="s">|</span><span class="t">35</span>=A<span class="s">|</span><span class="t">34</span>=1<span class="s">|</span><span class="t">49</span>=<span class="v">VENUE</span><span class="s">|</span><span class="t">98</span>=0</span></div>
+          <div class="wire-line"><span class="dir out">&#8594;</span><span class="msg">NewOrderSingle</span><span class="raw"><span class="t">35</span>=D<span class="s">|</span><span class="t">34</span>=2<span class="s">|</span><span class="t">11</span>=<span class="v">order-1</span><span class="s">|</span><span class="t">55</span>=<span class="v">BTC/USD</span><span class="s">|</span><span class="t">54</span>=1<span class="s">|</span><span class="t">44</span>=65000</span></div>
+          <div class="wire-line"><span class="dir in">&#8592;</span><span class="msg">ExecutionReport</span><span class="raw"><span class="t">35</span>=8<span class="s">|</span><span class="t">34</span>=2<span class="s">|</span><span class="t">11</span>=<span class="v">order-1</span><span class="s">|</span><span class="t">39</span>=0<span class="s">|</span><span class="t">150</span>=0</span></div>
+          <div class="wire-line done"><span class="dir">&#10003;</span><span>order-1 filled &middot; sequence in sync &middot; session active</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats wrap" style="margin-top:72px;">
+      <div class="stats-grid">
+        <div class="stat"><div class="n">0</div><div class="l">runtime deps</div></div>
+        <div class="stat"><div class="n">25</div><div class="l">tests passing</div></div>
+        <div class="stat"><div class="n">3</div><div class="l">FIX versions</div></div>
+        <div class="stat"><div class="n">2</div><div class="l">session roles</div></div>
+        <div class="stat"><div class="n">MIT</div><div class="l">licensed</div></div>
+        <div class="stat"><div class="n">100%</div><div class="l">TypeScript</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Why fixwire</p>
+        <h2 class="sec-title">Most FIX libraries parse messages. The hard part is the session.</h2>
+        <p>
+          Encoding tag=value is a weekend. The session layer is the swamp: resend requests,
+          gap-fill versus sequence-reset, recovery after a dirty disconnect. fixwire gets that
+          part right, and proves it with tests.
+        </p>
+      </div>
+      <div class="why-grid">
+        <div class="card reveal">
+          <div class="k">Correctness</div>
+          <h3>Right where it counts</h3>
+          <p>
+            Gap detection and ResendRequest, true replay with PossDup and OrigSendingTime,
+            SequenceReset gap-fill, CompID and checksum validation, and recovery after a dirty
+            reconnect. The failure modes that corrupt an order flow are tested, not hoped for.
+          </p>
+        </div>
+        <div class="card reveal">
+          <div class="k">Developer experience</div>
+          <h3>Typed and modern</h3>
+          <p>
+            An async, event-driven API with fully typed messages and events, order builders, and
+            human-readable logging from a FIX dictionary. It reads like TypeScript, not a port of
+            a 2004 Java engine.
+          </p>
+        </div>
+        <div class="card reveal">
+          <div class="k">Supply chain</div>
+          <h3>Zero dependencies</h3>
+          <p>
+            The entire engine ships with no runtime dependencies. Nothing transitive to audit, no
+            surprise breakage upstream. You can read the whole thing in an afternoon before you
+            trust it with real orders.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="code" style="padding-top:24px;">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">In practice</p>
+        <h2 class="sec-title">Connect, send, and get filled in a dozen lines.</h2>
+      </div>
+      <div class="code-shell reveal">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="initiator">initiator.ts</button>
+          <button class="tab" data-tab="acceptor">acceptor.ts</button>
+          <button class="tab" data-tab="dictionary">dictionary.ts</button>
+        </div>
+        <div class="panel-code active" data-panel="initiator"><pre><code>import { Session, MsgType, Tag, newOrderSingle, Side, OrdType } from 'fixwire'
+
+const session = new Session({
+  senderCompId: 'CLIENT',
+  targetCompId: 'VENUE',
+  host: 'fix.venue.com',
+  port: 9876,
+  tls: true,
+  reconnect: true,
+})
+
+session.on('logon', () => {
+  session.send(MsgType.NewOrderSingle, newOrderSingle({
+    clOrdId: 'order-1',
+    symbol: 'BTC/USD',
+    side: Side.Buy,
+    orderQty: 1,
+    ordType: OrdType.Limit,
+    price: 65000,
+  }))
+})
+
+session.on('app', (msg) => {
+  if (msg.msgType === MsgType.ExecutionReport) {
+    console.log('fill', msg.get(Tag.ClOrdID), msg.get(Tag.OrdStatus))
+  }
+})
+
+session.connect()</code></pre></div>
+        <div class="panel-code" data-panel="acceptor"><pre><code>import { Acceptor, MsgType, Tag } from 'fixwire'
+
+const acceptor = new Acceptor({
+  senderCompId: 'SERVER',
+  targetCompId: 'CLIENT',
+  port: 9876,
+})
+
+acceptor.on('session', (session) => {
+  // Wire handlers before the counterparty logs on.
+  session.on('app', (msg) => {
+    if (msg.msgType === MsgType.NewOrderSingle) {
+      session.send(MsgType.ExecutionReport, [
+        [Tag.ClOrdID, msg.get(Tag.ClOrdID) ?? ''],
+        [Tag.ExecType, '0'],
+        [Tag.OrdStatus, '0'],
+      ])
+    }
+  })
+})
+
+acceptor.listen()</code></pre></div>
+        <div class="panel-code" data-panel="dictionary"><pre><code>import { parseDictionary, describe } from 'fixwire'
+import { readFileSync } from 'node:fs'
+
+// Point it at any QuickFIX data dictionary.
+const dict = parseDictionary(readFileSync('FIX44.xml', 'utf8'))
+
+session.on('message', (msg) => {
+  console.log(describe(msg, dict))
+  // Side=1(BUY) ClOrdID=order-1 Symbol=BTC/USD OrdType=2(LIMIT)
+})</code></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" style="padding-top:24px;">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">What is inside</p>
+        <h2 class="sec-title">A complete session engine, both sides of the wire.</h2>
+      </div>
+      <div class="feat-grid reveal">
+        <div class="feat"><div class="fk">35=A</div><h3>Session state machine</h3><p>Logon, logout, heartbeats, test requests, sequence tracking.</p></div>
+        <div class="feat"><div class="fk">35=2</div><h3>Resend &amp; gap-fill</h3><p>Real replay with PossDup, admin runs gap-filled correctly.</p></div>
+        <div class="feat"><div class="fk">reconnect</div><h3>Auto-reconnect</h3><p>Exponential backoff on unexpected drops, never after a clean logout.</p></div>
+        <div class="feat"><div class="fk">35=3</div><h3>Inbound validation</h3><p>Checksum, CompID, BeginString and required-tag checks with Reject.</p></div>
+        <div class="feat"><div class="fk">store</div><h3>Pluggable stores</h3><p>In-memory or file-backed sequence and message stores. Bring your own.</p></div>
+        <div class="feat"><div class="fk">xml</div><h3>FIX dictionary</h3><p>Parse any QuickFIX spec, readable logs, typed-constant codegen.</p></div>
+        <div class="feat"><div class="fk">tls</div><h3>TCP &amp; TLS</h3><p>Plain or FIX-over-TLS transport with full connection options.</p></div>
+        <div class="feat"><div class="fk">4.2 / 4.4 / 5.0</div><h3>Initiator + Acceptor</h3><p>Client and server roles, FIX 4.2 through 5.0 (FIXT.1.1).</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="correctness" style="padding-top:24px;">
+    <div class="wrap">
+      <div class="proof-grid">
+        <div class="sec-head reveal" style="margin-bottom:0;">
+          <p class="eyebrow">Proof, not promises</p>
+          <h2 class="sec-title">The nasty cases are the test suite.</h2>
+          <p>
+            A FIX library is only as trustworthy as its handling of the moments that go wrong.
+            Every one of these is a real scenario fixwire is tested against, including a full
+            round-trip of its own acceptor talking to its own initiator.
+          </p>
+        </div>
+        <div class="test-term reveal" aria-label="test output">
+          <div class="cmd"><span class="pr">$</span> npm test</div>
+          <div style="height:10px;"></div>
+          <span class="pass">detects a sequence gap and recovers via gap-fill</span><br />
+          <span class="pass">replays application messages with PossDup on ResendRequest</span><br />
+          <span class="pass">discards a message with a bad checksum</span><br />
+          <span class="pass">logs out on a sequence number that is too low</span><br />
+          <span class="pass">logs out on a CompID mismatch</span><br />
+          <span class="pass">reconnects after an unexpected disconnect</span><br />
+          <span class="pass">rejects a message missing SendingTime</span><br />
+          <span class="pass">FIXT.1.1 logon carries DefaultApplVerID</span><br />
+          <span class="pass">acceptor and initiator complete a full round-trip</span><br />
+          <span class="muted">  ... and 16 more</span>
+          <span class="summ">&#10003; 25 passing &middot; 0 failing</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:12px;">
+    <div class="wrap">
+      <div class="cta-band reveal">
+        <h2>Build on a FIX layer you can trust.</h2>
+        <p>Open source, MIT licensed, zero dependencies. Clone it, read it, and connect your first venue today.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/samartha-hegde/fixwire">Get started on GitHub</a>
+          <button class="btn btn-ghost copy-btn" data-copy="npm install fixwire">npm install fixwire</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot-inner">
+    <span class="foot-brand">fix<b>wire</b></span>
+    <nav class="foot-links">
+      <a href="https://github.com/samartha-hegde/fixwire">GitHub</a>
+      <a href="https://github.com/samartha-hegde/fixwire#readme">Docs</a>
+      <a href="https://github.com/samartha-hegde/fixwire/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/samartha-hegde/fixwire/blob/main/LICENSE">License</a>
+    </nav>
+    <span class="foot-note">MIT &middot; zero dependencies</span>
+  </div>
+</footer>
+
+<script>
+  // Copy buttons
+  document.querySelectorAll('[data-copy]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(btn.getAttribute('data-copy'));
+        const prev = btn.textContent;
+        btn.textContent = 'Copied';
+        btn.classList.add('ok');
+        setTimeout(() => { btn.textContent = prev; btn.classList.remove('ok'); }, 1400);
+      } catch (e) { /* clipboard unavailable */ }
+    });
+  });
+
+  // Code tabs
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const name = tab.getAttribute('data-tab');
+      tabs.forEach((t) => t.classList.toggle('active', t === tab));
+      document.querySelectorAll('.panel-code').forEach((p) => {
+        p.classList.toggle('active', p.getAttribute('data-panel') === name);
+      });
+    });
+  });
+
+  // Lightweight TypeScript highlighter
+  const KEYWORDS = new Set(['import','from','const','let','new','return','true','false','void','async','await','export','type','interface','if','else','null','undefined']);
+  const TOKEN = /(\/\/[^\n]*)|('(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|\b(\d+(?:\.\d+)?)\b|([A-Za-z_$][A-Za-z0-9_$]*)/g;
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  document.querySelectorAll('pre code').forEach((el) => {
+    const src = el.textContent;
+    el.innerHTML = esc(src).replace(TOKEN, (m, com, str, num, word) => {
+      if (com) return '<span class="tok-com">' + com + '</span>';
+      if (str) return '<span class="tok-str">' + str + '</span>';
+      if (num) return '<span class="tok-num">' + num + '</span>';
+      if (word) {
+        if (KEYWORDS.has(word)) return '<span class="tok-key">' + word + '</span>';
+        if (/^[A-Z]/.test(word)) return '<span class="tok-type">' + word + '</span>';
+      }
+      return m;
+    });
+  });
+
+  // Scroll reveal
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+
+    // Stagger the hero wire lines
+    document.querySelectorAll('#wire .wire-line').forEach((line, i) => {
+      line.style.animationDelay = (i * 0.5 + 0.2) + 's';
+    });
+  } else {
+    document.querySelectorAll('.reveal').forEach((el) => el.classList.add('in'));
+  }
+</script>
+
+</body>
+</html>

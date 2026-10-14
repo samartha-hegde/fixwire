@@ -1,6 +1,7 @@
 # fixwire
 
 [![CI](https://github.com/samartha-hegde/fixwire/actions/workflows/ci.yml/badge.svg)](https://github.com/samartha-hegde/fixwire/actions/workflows/ci.yml)
+[![website](https://img.shields.io/badge/website-fixwire-f5a623.svg)](https://samartha-hegde.github.io/fixwire)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 
