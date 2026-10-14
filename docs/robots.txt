@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://samartha-hegde.github.io/fixwire/sitemap.xml

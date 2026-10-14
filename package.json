@@ -1,7 +1,7 @@
 {
   "name": "fixwire",
   "version": "0.3.0",
-  "description": "A modern, fully-typed FIX protocol engine for TypeScript. Correct session layer, zero dependencies, great DX.",
+  "description": "A modern, fully-typed FIX protocol library for TypeScript. A QuickFIX-style engine with a correct session layer, zero dependencies, initiator and acceptor, FIX 4.2 to 5.0.",
   "type": "module",
   "license": "MIT",
   "author": "Samartha Hegde",
@@ -13,9 +13,16 @@
   "keywords": [
     "fix",
     "fix-protocol",
+    "fix-engine",
+    "fix-library",
+    "typescript",
     "fix44",
-    "trading",
+    "fix42",
+    "fix50",
+    "fixt",
     "quickfix",
+    "trading",
+    "order-management",
     "financial",
     "fintech"
   ],
