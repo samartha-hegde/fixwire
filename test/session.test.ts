@@ -449,3 +449,30 @@ test('rejects an application message missing a dictionary-required field', async
   session.disconnect();
   acc.close();
 });
+
+test('throws on an outbound message missing a required field', async () => {
+  const dict = parseDictionary(
+    `<fix><messages><message name="NewOrderSingle" msgtype="D" msgcat="app">
+       <field name="ClOrdID" required="Y"/><field name="Symbol" required="Y"/>
+     </message></messages>
+     <fields><field number="11" name="ClOrdID" type="STRING"/>
+       <field number="55" name="Symbol" type="STRING"/></fields></fix>`,
+  );
+  const acc = await startAcceptor((msg, send) => {
+    if (msg.msgType === MsgType.Logon) replyLogon(send);
+  });
+  const session = newSession(acc.port, { dictionary: dict, validateRequired: true });
+  await new Promise<void>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('logon', () => {
+      assert.throws(
+        () => session.send(MsgType.NewOrderSingle, [[Tag.ClOrdID, 'o-1']]), // missing Symbol
+        /missing required field 55/,
+      );
+      resolve();
+    });
+    session.connect();
+  });
+  session.disconnect();
+  acc.close();
+});

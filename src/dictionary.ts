@@ -33,8 +33,41 @@ const FIELD = /<field\s+([^>]*?)\/>|<field\s+([^>]*?)>([\s\S]*?)<\/field>/g;
 const VALUE = /<value\s+([^>]*?)\/?>/g;
 const MESSAGE_BLOCK = /<message\s+([^>]*?)>([\s\S]*?)<\/message>|<message\s+([^>]*?)\/>/g;
 const FIELD_REF = /<field\s+([^>]*?)\/?>/g;
+// A component definition (not a self-closing reference): the opening tag must not end in "/>".
+const COMPONENT_DEF = /<component\s+([^>]*?)(?<!\/)>([\s\S]*?)<\/component>/g;
 // Innermost group: a <group> whose body contains no further <group>.
 const INNER_GROUP = /<group\s+([^>]*?)>((?:(?!<group)[\s\S])*?)<\/group>/;
+
+/**
+ * Inline `<component name="X" .../>` references with the body of their definition
+ * from the `<components>` section, recursively (iterating until stable). An
+ * optional component reference downgrades its inlined fields to not-required.
+ */
+function expandComponents(xml: string): string {
+  const defs = new Map<string, string>();
+  COMPONENT_DEF.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = COMPONENT_DEF.exec(xml)) !== null) {
+    const name = attrs(m[1] ?? '').name;
+    if (name) defs.set(name, m[2] ?? '');
+  }
+  if (defs.size === 0) return xml;
+
+  let work = xml;
+  for (let pass = 0; pass < 10; pass++) {
+    let changed = false;
+    // Only self-closing refs (<component .../>), never the definitions.
+    work = work.replace(/<component\s+([^>]*?)\/>/g, (whole, attrStr: string) => {
+      const a = attrs(attrStr);
+      const body = a.name ? defs.get(a.name) : undefined;
+      if (body === undefined) return whole;
+      changed = true;
+      return a.required === 'Y' ? body : body.replace(/required="Y"/g, 'required="N"');
+    });
+    if (!changed) break;
+  }
+  return work;
+}
 
 function attrs(s: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -66,8 +99,11 @@ function fieldTags(fragment: string, byName: Map<string, number>): number[] {
 
 /**
  * Resolve repeating groups by rewriting the XML innermost-out: each innermost
- * `<group>` is recorded, then replaced by a stub `<field>` for its count field,
- * so an enclosing group picks up the nested count tag as one of its members.
+ * `<group>` is recorded, then replaced by a stub `<field>` for its count field
+ * followed by the group's own fields. Inlining the fields means an enclosing
+ * group's member set is transitive (it includes nested count tags AND nested
+ * member tags), so {@link getGroups} captures full entries and a nested group is
+ * then extractable by calling {@link getGroups} again on an entry.
  */
 function resolveGroups(xml: string, byName: Map<string, number>): Map<number, GroupSpec> {
   const groups = new Map<number, GroupSpec>();
@@ -85,11 +121,8 @@ function resolveGroups(xml: string, byName: Map<string, number>): Map<number, Gr
         groups.set(countTag, { countTag, name, delimiterTag, memberTags });
       }
     }
-    // Replace this group with a stub field so a parent group counts it as a member.
-    work =
-      work.slice(0, m.index) +
-      (name ? `<field name="${name}"/>` : '') +
-      work.slice(m.index + m[0].length);
+    const stub = name ? `<field name="${name}"/>${body}` : body;
+    work = work.slice(0, m.index) + stub + work.slice(m.index + m[0].length);
   }
   return groups;
 }
@@ -111,11 +144,11 @@ function stripGroups(fragment: string): string {
  * `<message>` declarations. Covers field tag/name/type, enum values, the
  * msgtype->name map, repeating-group structure, and per-message required fields.
  *
- * ponytail: groups referenced via `<component>` are not expanded, and nested
- * groups are flattened into the parent entry on extraction. Covers the common
- * inline-group messages; component-heavy FIX 5.0 messages need more work.
+ * Expands `<component>` references and resolves nested groups, so component-heavy
+ * and nested-group messages (common in FIX 5.0) parse correctly.
  */
-export function parseDictionary(xml: string): Dictionary {
+export function parseDictionary(rawXml: string): Dictionary {
+  const xml = expandComponents(rawXml);
   const byTag = new Map<number, FieldDef>();
   const byName = new Map<string, number>();
 

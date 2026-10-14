@@ -41,7 +41,11 @@ test('parseDictionary extracts group specs, including nested groups innermost-ou
   const dict = parseDictionary(GROUP_XML);
   const rel = dict.groups.get(146);
   assert.equal(rel?.delimiterTag, 55, 'first member is the delimiter');
-  assert.deepEqual(rel?.memberTags, [55, 48, 555], 'nested group count tag is a member');
+  assert.deepEqual(
+    rel?.memberTags,
+    [55, 48, 555, 600],
+    'member set is transitive (nested included)',
+  );
   const legs = dict.groups.get(555);
   assert.deepEqual(legs?.memberTags, [600]);
 });
@@ -75,6 +79,58 @@ test('group builds count + repeated entry fields', () => {
     [55, 'BTC/USD'],
     [55, 'ETH/USD'],
   ]);
+});
+
+test('getGroups preserves nested groups (extractable from an entry)', () => {
+  const dict = parseDictionary(GROUP_XML);
+  const msg = new FixMessage([
+    [262, 'req-1'],
+    [146, '1'], // one NoRelatedSym entry
+    [55, 'BTC/USD'],
+    [48, 'X1'],
+    [555, '2'], // nested NoLegs = 2
+    [600, 'LEG1'],
+    [600, 'LEG2'],
+  ]);
+  const entries = getGroups(msg, 146, dict);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0]?.get(55), 'BTC/USD');
+  const legs = getGroups(entries[0] as FixMessage, 555, dict);
+  assert.equal(legs.length, 2);
+  assert.equal(legs[0]?.get(600), 'LEG1');
+  assert.equal(legs[1]?.get(600), 'LEG2');
+});
+
+test('parseDictionary expands components for required fields', () => {
+  const dict = parseDictionary(
+    `<fix>
+       <messages>
+         <message name="NewOrderSingle" msgtype="D" msgcat="app">
+           <field name="ClOrdID" required="Y"/>
+           <component name="Instrument" required="Y"/>
+         </message>
+         <message name="OrderCancelRequest" msgtype="F" msgcat="app">
+           <field name="ClOrdID" required="Y"/>
+           <component name="Instrument" required="N"/>
+         </message>
+       </messages>
+       <components>
+         <component name="Instrument">
+           <field name="Symbol" required="Y"/>
+           <field name="SecurityID" required="N"/>
+         </component>
+       </components>
+       <fields>
+         <field number="11" name="ClOrdID" type="STRING"/>
+         <field number="55" name="Symbol" type="STRING"/>
+         <field number="48" name="SecurityID" type="STRING"/>
+       </fields>
+     </fix>`,
+  );
+  // Required component contributes its required fields.
+  assert.deepEqual(dict.required.get('D'), [11, 55]);
+  // Optional component downgrades its fields to not required.
+  assert.deepEqual(dict.required.get('F'), [11]);
 });
 
 const SAMPLE_XML = `

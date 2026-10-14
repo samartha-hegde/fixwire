@@ -6,6 +6,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-14
+
+### Added
+
+- **Dictionary `<component>` expansion**: `parseDictionary` inlines component
+  references (recursively, downgrading required on optional refs), so
+  component-heavy messages resolve their fields and groups correctly.
+- **Nested repeating groups preserved**: a group's member set is now transitive,
+  so `getGroups` captures full entries and a nested group is extractable by
+  calling `getGroups` again on an entry.
+- **Outbound validation**: `session.send()` throws before sending when a required
+  field is missing (with `dictionary` + `validateRequired`).
+- **Mutual TLS**: documented and supported on both initiator and acceptor via
+  standard Node TLS options (client certificates, `requestCert`).
+
+### Notes
+
+- FIX message-level encryption (`EncryptMethod` 1-6) is intentionally unsupported;
+  TLS is the transport-security mechanism and `EncryptMethod` is always `0`.
+
 ## [0.3.0] - 2026-10-14
 
 ### Added
@@ -71,7 +91,8 @@ Initial public release. FIX 4.4, initiator (client) side.
 - `newOrderSingle` builder with `Side` / `OrdType` / `TimeInForce` constants.
 - TCP and TLS transport.
 
-[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/samartha-hegde/fixwire/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/samartha-hegde/fixwire/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/samartha-hegde/fixwire/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/samartha-hegde/fixwire/releases/tag/v0.1.0

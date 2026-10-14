@@ -222,6 +222,35 @@ It is also verified across protocol versions, **FIX 4.2, 4.4, and 5.0
 (FIXT.1.1)**, each against its own data dictionary. Run them yourself from
 [`examples/interop`](./examples/interop).
 
+## Security
+
+Transport security is TLS, configured through standard Node TLS options. (FIX's
+own message-level encryption via `EncryptMethod` is obsolete and intentionally
+unsupported; `EncryptMethod` is always `0`. Use TLS.)
+
+Mutual TLS works on both sides. Initiator presenting a client certificate:
+
+```ts
+const session = new Session({
+  senderCompId: 'CLIENT',
+  targetCompId: 'VENUE',
+  host: 'fix.venue.com',
+  port: 9876,
+  tls: { ca, cert, key, servername: 'fix.venue.com' },
+});
+```
+
+Acceptor requiring client certificates:
+
+```ts
+const acceptor = new Acceptor({
+  senderCompId: 'SERVER',
+  targetCompId: 'CLIENT',
+  port: 9876,
+  tls: { key, cert, ca, requestCert: true, rejectUnauthorized: true },
+});
+```
+
 ## Roadmap
 
 Shipped:
@@ -234,13 +263,15 @@ Shipped:
 - [x] Multi-counterparty acceptor routing (omit `targetCompId`, learn from Logon)
 - [x] Message-level required-field validation driven by the dictionary
 - [x] Logon authentication: Username / Password / RawData, and an acceptor `authenticate` gate
+- [x] Dictionary `<component>` expansion and nested repeating groups preserved as structure
+- [x] Dictionary-driven outbound message validation
+- [x] Mutual TLS (client certificates on both sides)
 
 Next, in rough order:
 
-- [ ] Component (`<component>`) expansion in the dictionary
-- [ ] Nested repeating groups preserved as structure, not flattened
-- [ ] Dictionary-driven outbound message validation
-- [ ] Mutual-TLS helpers and encryption (EncryptMethod) support
+- [ ] Message-type allowlist and graceful unknown-message handling
+- [ ] Observability hooks (metrics / structured logging adapters)
+- [ ] Browser / WebSocket-FIX transport
 
 ## Using fixwire with AI assistants
 

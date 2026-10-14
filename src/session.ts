@@ -220,9 +220,22 @@ export class Session extends EventEmitter {
     socket.on('close', () => this.onClose());
   }
 
-  /** Send an application message. Throws if the session is not active. */
+  /**
+   * Send an application message. Throws if the session is not active, or (when
+   * `validateRequired` + `dictionary` are set) if a required field is missing.
+   */
   send(msgType: string, fields: Field[] = []): void {
     if (this.state !== 'active') throw new Error(`cannot send in state "${this.state}"`);
+    if (this.cfg.validateRequired && this.cfg.dictionary) {
+      const req = this.cfg.dictionary.required.get(msgType);
+      if (req) {
+        const present = new Set(fields.map(([t]) => t));
+        const missing = req.find((t) => !present.has(t));
+        if (missing !== undefined) {
+          throw new Error(`outbound ${msgType} is missing required field ${missing}`);
+        }
+      }
+    }
     this.sendRaw(msgType, fields);
   }
 
