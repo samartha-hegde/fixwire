@@ -218,7 +218,9 @@ different languages, no shared heritage with fixwire.
 | [QuickFIX](https://github.com/quickfix/quickfix) | C++ (reference engine) | logon → order → fill → logout |
 | [QuickFIX/J](https://github.com/quickfix-j/quickfixj) | Java | logon → order → fill → logout |
 
-Run them yourself from [`examples/interop`](./examples/interop).
+It is also verified across protocol versions, **FIX 4.2, 4.4, and 5.0
+(FIXT.1.1)**, each against its own data dictionary. Run them yourself from
+[`examples/interop`](./examples/interop).
 
 ## Roadmap
 

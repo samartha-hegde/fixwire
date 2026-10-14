@@ -32,17 +32,24 @@ timeout, or socket error), so each `run.sh` is a pass/fail gate.
 **quickfixgo** (needs Go):
 
 ```bash
-bash quickfixgo/run.sh
+bash quickfixgo/run.sh        # FIX.4.4 (default)
+bash quickfixgo/run.sh 42     # FIX.4.2
+bash quickfixgo/run.sh 50     # FIX 5.0 over FIXT.1.1
 ```
 
-The script builds the Go acceptor, starts it, runs the fixwire client, and tears
-down. Expected tail:
+The script builds the Go acceptor, starts it with the matching data dictionary,
+runs the fixwire client with the matching `BeginString`, and tears down. Expected
+tail:
 
 ```
-PASS  logon       quickfixgo (Go) accepted our Logon
+PASS  logon       quickfixgo (Go, FIX.4.4) accepted our Logon
 PASS  fill        ExecutionReport order-1 ordStatus=2
-PASS  interop with quickfixgo (Go) OK
+PASS  interop with quickfixgo (Go, FIX.4.4) OK
 ```
+
+fixwire is verified over **FIX 4.2, 4.4, and 5.0 (FIXT.1.1)** this way; the
+4.2 order adds the `HandlInst` the older dictionary requires, and 5.0 sends
+`DefaultApplVerID` on logon.
 
 **QuickFIX (C++/Python)** (needs Python 3 and a C++ compiler):
 

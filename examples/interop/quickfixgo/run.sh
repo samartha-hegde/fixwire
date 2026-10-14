@@ -1,17 +1,32 @@
 #!/usr/bin/env bash
 # Interop test: fixwire (initiator) against a quickfixgo (Go) acceptor.
-# Builds the acceptor if needed, starts it, runs the fixwire client, tears down.
+# Usage: run.sh [44|42|50]   (FIX protocol version; default 44)
+# Builds the acceptor, starts it with the right dictionary, runs the fixwire
+# client with a matching BeginString, and tears down.
 set -uo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$DIR/../../.." && pwd)"
 cd "$DIR"
 
-[ -f FIX44.xml ] || curl -fsSL -o FIX44.xml \
-  https://raw.githubusercontent.com/quickfixgo/quickfix/main/spec/FIX44.xml
+VERSION="${1:-44}"
+SPEC_BASE="https://raw.githubusercontent.com/quickfixgo/quickfix/main/spec"
+case "$VERSION" in
+44) CFG=acceptor.cfg    PORT=5101 BEGIN=FIX.4.4  APPLVER="" SPECS="FIX44.xml" ;;
+42) CFG=acceptor-42.cfg PORT=5111 BEGIN=FIX.4.2  APPLVER="" SPECS="FIX42.xml" ;;
+50) CFG=acceptor-50.cfg PORT=5112 BEGIN=FIXT.1.1 APPLVER="9" SPECS="FIXT11.xml FIX50SP2.xml" ;;
+*)
+  echo "usage: $0 [44|42|50]"
+  exit 1
+  ;;
+esac
+
+for s in $SPECS; do
+  [ -f "$s" ] || curl -fsSL -o "$s" "$SPEC_BASE/$s"
+done
 [ -x ./executor ] || go build -o executor .
 
 rm -f executor.log
-./executor >executor.log 2>&1 &
+./executor "$CFG" >executor.log 2>&1 &
 EPID=$!
 cleanup() { kill "$EPID" 2>/dev/null || true; }
 trap cleanup EXIT
@@ -27,7 +42,8 @@ if ! grep -q "ACCEPTOR LISTENING" executor.log 2>/dev/null; then
 fi
 
 cd "$REPO"
-FIX_PORT=5101 ENGINE="quickfixgo (Go)" node --import tsx examples/interop/client.ts
+FIX_PORT=$PORT FIX_BEGIN_STRING=$BEGIN FIX_APPL_VER_ID=$APPLVER ENGINE="quickfixgo (Go, $BEGIN)" \
+  node --import tsx examples/interop/client.ts
 CODE=$?
 
 echo ""

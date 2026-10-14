@@ -2,10 +2,13 @@
 // on, sends a NewOrderSingle, expects a filled ExecutionReport, logs out.
 // Configure via env: FIX_PORT (default 5101), ENGINE (label for output).
 // Exits 0 on success, 1 on any failure (reject, timeout, error).
-import { MsgType, OrdType, Session, Side, Tag } from '../../src/index.js';
+import { type Field, MsgType, OrdType, Session, Side, Tag } from '../../src/index.js';
 
 const PORT = Number(process.env.FIX_PORT ?? '5101');
 const ENGINE = process.env.ENGINE ?? 'the acceptor';
+const BEGIN_STRING = process.env.FIX_BEGIN_STRING ?? 'FIX.4.4';
+const APPL_VER_ID = process.env.FIX_APPL_VER_ID || undefined;
+const HANDL_INST = 21; // required on NewOrderSingle in FIX 4.2
 const BusinessMessageReject = 'j';
 
 function utcTransactTime(d = new Date()): string {
@@ -21,6 +24,8 @@ const session = new Session({
   targetCompId: 'SERVER',
   host: '127.0.0.1',
   port: PORT,
+  beginString: BEGIN_STRING,
+  defaultApplVerId: APPL_VER_ID,
   resetOnLogon: true,
 });
 
@@ -35,7 +40,7 @@ session.on('reject', (m) => fail(`session Reject (35=3): ${m.get(Tag.Text) ?? ''
 
 session.on('logon', () => {
   console.log(`PASS  logon       ${ENGINE} accepted our Logon`);
-  session.send(MsgType.NewOrderSingle, [
+  const order: Field[] = [
     [Tag.ClOrdID, 'order-1'],
     [Tag.Symbol, 'BTC/USD'],
     [Tag.Side, Side.Buy],
@@ -43,7 +48,9 @@ session.on('logon', () => {
     [Tag.OrdType, OrdType.Limit],
     [Tag.Price, '65000'],
     [Tag.TransactTime, utcTransactTime()],
-  ]);
+  ];
+  if (BEGIN_STRING === 'FIX.4.2') order.push([HANDL_INST, '1']); // HandlInst required in 4.2
+  session.send(MsgType.NewOrderSingle, order);
   console.log('  ->  sent        NewOrderSingle order-1 BTC/USD');
 });
 

@@ -1,6 +1,7 @@
-// A minimal quickfixgo acceptor (executor) used to interop-test fixwire.
-// It accepts a logon, and for each NewOrderSingle replies with a filled
-// ExecutionReport. Prints LOGON / ORDER / FILL so the test runner can observe it.
+// A version-agnostic quickfixgo acceptor (executor) used to interop-test fixwire
+// across FIX 4.2, 4.4, and 5.0 (FIXT.1.1). It accepts a logon and replies to each
+// NewOrderSingle with a filled ExecutionReport, building the reply from raw tags
+// so the same code serves every FIX version. Pass the config path as argv[1].
 package main
 
 import (
@@ -9,84 +10,69 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/quickfixgo/enum"
-	fix44er "github.com/quickfixgo/fix44/executionreport"
-	fix44nos "github.com/quickfixgo/fix44/newordersingle"
-	"github.com/quickfixgo/field"
 	"github.com/quickfixgo/quickfix"
-	"github.com/shopspring/decimal"
+	"github.com/quickfixgo/tag"
 )
 
 type executor struct {
-	*quickfix.MessageRouter
 	execID int
 }
 
-func newExecutor() *executor {
-	e := &executor{MessageRouter: quickfix.NewMessageRouter()}
-	e.AddRoute(fix44nos.Route(e.onNewOrderSingle))
-	return e
+func (e *executor) OnCreate(quickfix.SessionID)                   {}
+func (e *executor) OnLogon(id quickfix.SessionID)                 { fmt.Println("LOGON", id) }
+func (e *executor) OnLogout(id quickfix.SessionID)                { fmt.Println("LOGOUT", id) }
+func (e *executor) ToAdmin(*quickfix.Message, quickfix.SessionID) {}
+func (e *executor) ToApp(*quickfix.Message, quickfix.SessionID) error {
+	return nil
 }
-
-func (e *executor) OnCreate(quickfix.SessionID)                               {}
-func (e *executor) OnLogon(id quickfix.SessionID)                             { fmt.Println("LOGON", id) }
-func (e *executor) OnLogout(id quickfix.SessionID)                            { fmt.Println("LOGOUT", id) }
-func (e *executor) ToAdmin(*quickfix.Message, quickfix.SessionID)             {}
-func (e *executor) ToApp(*quickfix.Message, quickfix.SessionID) error         { return nil }
 func (e *executor) FromAdmin(*quickfix.Message, quickfix.SessionID) quickfix.MessageRejectError {
 	return nil
 }
 
-func (e *executor) FromApp(msg *quickfix.Message, id quickfix.SessionID) quickfix.MessageRejectError {
-	return e.Route(msg, id)
-}
-
-func (e *executor) nextExecID() string {
-	e.execID++
-	return fmt.Sprintf("exec-%d", e.execID)
-}
-
-func (e *executor) onNewOrderSingle(
-	msg fix44nos.NewOrderSingle,
+func (e *executor) FromApp(
+	msg *quickfix.Message,
 	sessionID quickfix.SessionID,
 ) quickfix.MessageRejectError {
-	clOrdID, err := msg.GetClOrdID()
+	msgType, err := msg.Header.GetString(tag.MsgType)
 	if err != nil {
 		return err
 	}
-	symbol, err := msg.GetSymbol()
-	if err != nil {
-		return err
+	if msgType != "D" { // NewOrderSingle
+		return nil
 	}
-	side, err := msg.GetSide()
-	if err != nil {
-		return err
-	}
-	qty, err := msg.GetOrderQty()
-	if err != nil {
-		return err
-	}
-	price := decimal.Zero
-	if msg.HasPrice() {
-		price, _ = msg.GetPrice()
+
+	get := func(t quickfix.Tag) string { v, _ := msg.Body.GetString(t); return v }
+	clOrdID := get(tag.ClOrdID)
+	symbol := get(tag.Symbol)
+	side := get(tag.Side)
+	qty := get(tag.OrderQty)
+	px := get(tag.Price)
+	if px == "" {
+		px = "0"
 	}
 	fmt.Println("ORDER", clOrdID, symbol)
 
-	exec := fix44er.New(
-		field.NewOrderID(clOrdID),
-		field.NewExecID(e.nextExecID()),
-		field.NewExecType(enum.ExecType_FILL),
-		field.NewOrdStatus(enum.OrdStatus_FILLED),
-		field.NewSide(side),
-		field.NewLeavesQty(decimal.Zero, 2),
-		field.NewCumQty(qty, 2),
-		field.NewAvgPx(price, 2),
-	)
-	exec.SetClOrdID(clOrdID)
-	exec.SetSymbol(symbol)
-	exec.SetOrderQty(qty, 2)
+	e.execID++
+	reply := quickfix.NewMessage()
+	reply.Header.SetString(tag.MsgType, "8") // ExecutionReport
+	reply.Body.SetString(tag.OrderID, clOrdID)
+	reply.Body.SetString(tag.ExecID, fmt.Sprintf("exec-%d", e.execID))
 
-	if err := quickfix.SendToTarget(exec, sessionID); err != nil {
+	execType := "F" // TRADE (FIX 4.3+)
+	if sessionID.BeginString == "FIX.4.2" {
+		reply.Body.SetString(tag.ExecTransType, "0") // required in FIX 4.2
+		execType = "2"                               // FILL
+	}
+	reply.Body.SetString(tag.ExecType, execType)
+	reply.Body.SetString(tag.OrdStatus, "2") // FILLED
+	reply.Body.SetString(tag.Symbol, symbol)
+	reply.Body.SetString(tag.Side, side)
+	reply.Body.SetString(tag.LeavesQty, "0")
+	reply.Body.SetString(tag.CumQty, qty)
+	reply.Body.SetString(tag.AvgPx, px)
+	reply.Body.SetString(tag.ClOrdID, clOrdID)
+
+	if err := quickfix.SendToTarget(reply, sessionID); err != nil {
 		fmt.Println("send error:", err)
 	} else {
 		fmt.Println("FILL", clOrdID)
@@ -95,7 +81,11 @@ func (e *executor) onNewOrderSingle(
 }
 
 func main() {
-	cfg, err := os.Open("acceptor.cfg")
+	cfgPath := "acceptor.cfg"
+	if len(os.Args) > 1 {
+		cfgPath = os.Args[1]
+	}
+	cfg, err := os.Open(cfgPath)
 	if err != nil {
 		panic(err)
 	}
@@ -104,7 +94,7 @@ func main() {
 		panic(err)
 	}
 	acceptor, err := quickfix.NewAcceptor(
-		newExecutor(),
+		&executor{},
 		quickfix.NewMemoryStoreFactory(),
 		settings,
 		quickfix.NewNullLogFactory(),
