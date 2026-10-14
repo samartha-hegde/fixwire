@@ -202,8 +202,22 @@ npm test
 ✔ logs out on a CompID mismatch
 ✔ logs out on a sequence number that is too low
 ✔ reconnects after an unexpected disconnect
-  …16 passing
+  …33 passing
 ```
+
+## Interoperability
+
+Beyond its own test suite, fixwire is interop-tested against independent,
+production FIX engines: it logs on, trades, and logs out against their acceptors,
+passing their strict `FIX44.xml` dictionary validation. Different codebases,
+different languages, no shared heritage with fixwire.
+
+| Engine | Language | Result |
+| ------ | -------- | ------ |
+| [quickfixgo](https://github.com/quickfixgo/quickfix) | Go | logon → order → fill → logout |
+| [QuickFIX](https://github.com/quickfix/quickfix) | C++ (reference engine) | logon → order → fill → logout |
+
+Run them yourself from [`examples/interop`](./examples/interop).
 
 ## Roadmap
 
