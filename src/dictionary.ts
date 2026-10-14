@@ -1,5 +1,5 @@
 import { Tag } from './constants.js';
-import type { FixMessage } from './message.js';
+import { type Field, FixMessage } from './message.js';
 
 export interface FieldDef {
   tag: number;
@@ -9,17 +9,32 @@ export interface FieldDef {
   values?: Record<string, string>;
 }
 
+/** A repeating group: its count field, the delimiter (first member), and members. */
+export interface GroupSpec {
+  countTag: number;
+  name: string;
+  delimiterTag: number;
+  memberTags: number[];
+}
+
 export interface Dictionary {
   byTag: Map<number, FieldDef>;
   byName: Map<string, number>;
   /** msgtype (tag 35 value) -> message name. */
   messages: Map<string, string>;
+  /** count tag (NoXXX) -> repeating group definition. */
+  groups: Map<number, GroupSpec>;
+  /** msgtype -> tags of top-level required fields. */
+  required: Map<string, number[]>;
 }
 
 const ATTR = /(\w+)\s*=\s*"([^"]*)"/g;
 const FIELD = /<field\s+([^>]*?)\/>|<field\s+([^>]*?)>([\s\S]*?)<\/field>/g;
 const VALUE = /<value\s+([^>]*?)\/?>/g;
-const MESSAGE = /<message\s+([^>]*?)\/?>/g;
+const MESSAGE_BLOCK = /<message\s+([^>]*?)>([\s\S]*?)<\/message>|<message\s+([^>]*?)\/>/g;
+const FIELD_REF = /<field\s+([^>]*?)\/?>/g;
+// Innermost group: a <group> whose body contains no further <group>.
+const INNER_GROUP = /<group\s+([^>]*?)>((?:(?!<group)[\s\S])*?)<\/group>/;
 
 function attrs(s: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -32,11 +47,73 @@ function attrs(s: string): Record<string, string> {
   return out;
 }
 
+/** Collect the resolved tags of `<field>` references inside an XML fragment, in order. */
+function fieldTags(fragment: string, byName: Map<string, number>): number[] {
+  const tags: number[] = [];
+  const seen = new Set<number>();
+  FIELD_REF.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = FIELD_REF.exec(fragment)) !== null) {
+    const name = attrs(m[1] ?? '').name;
+    const tag = name ? byName.get(name) : undefined;
+    if (tag !== undefined && !seen.has(tag)) {
+      seen.add(tag);
+      tags.push(tag);
+    }
+  }
+  return tags;
+}
+
+/**
+ * Resolve repeating groups by rewriting the XML innermost-out: each innermost
+ * `<group>` is recorded, then replaced by a stub `<field>` for its count field,
+ * so an enclosing group picks up the nested count tag as one of its members.
+ */
+function resolveGroups(xml: string, byName: Map<string, number>): Map<number, GroupSpec> {
+  const groups = new Map<number, GroupSpec>();
+  let work = xml;
+  for (;;) {
+    const m = INNER_GROUP.exec(work);
+    if (!m) break;
+    const name = attrs(m[1] ?? '').name;
+    const body = m[2] ?? '';
+    const countTag = name ? byName.get(name) : undefined;
+    if (name && countTag !== undefined) {
+      const memberTags = fieldTags(body, byName);
+      const delimiterTag = memberTags[0];
+      if (delimiterTag !== undefined) {
+        groups.set(countTag, { countTag, name, delimiterTag, memberTags });
+      }
+    }
+    // Replace this group with a stub field so a parent group counts it as a member.
+    work =
+      work.slice(0, m.index) +
+      (name ? `<field name="${name}"/>` : '') +
+      work.slice(m.index + m[0].length);
+  }
+  return groups;
+}
+
+/** Strip all `<group>...</group>` blocks (innermost-out) so only top-level fields remain. */
+function stripGroups(fragment: string): string {
+  let work = fragment;
+  for (;;) {
+    const m = INNER_GROUP.exec(work);
+    if (!m) break;
+    work = work.slice(0, m.index) + work.slice(m.index + m[0].length);
+  }
+  return work;
+}
+
 /**
  * Parse a QuickFIX-format FIX data dictionary (e.g. FIX44.xml) into a runtime
- * {@link Dictionary}. Dependency-free: a small regex over the `<field>` and
- * `<message>` declarations. Covers field tag/name/type, enum values, and the
- * msgtype->name map.
+ * {@link Dictionary}. Dependency-free: regex over the `<field>`, `<group>` and
+ * `<message>` declarations. Covers field tag/name/type, enum values, the
+ * msgtype->name map, repeating-group structure, and per-message required fields.
+ *
+ * ponytail: groups referenced via `<component>` are not expanded, and nested
+ * groups are flattened into the parent entry on extraction. Covers the common
+ * inline-group messages; component-heavy FIX 5.0 messages need more work.
  */
 export function parseDictionary(xml: string): Dictionary {
   const byTag = new Map<number, FieldDef>();
@@ -66,15 +143,35 @@ export function parseDictionary(xml: string): Dictionary {
     byName.set(a.name, tag);
   }
 
+  const groups = resolveGroups(xml, byName);
+
   const messages = new Map<string, string>();
-  MESSAGE.lastIndex = 0;
+  const required = new Map<string, number[]>();
+  MESSAGE_BLOCK.lastIndex = 0;
   let mm: RegExpExecArray | null;
-  while ((mm = MESSAGE.exec(xml)) !== null) {
-    const a = attrs(mm[1] ?? '');
-    if (a.msgtype && a.name) messages.set(a.msgtype, a.name);
+  while ((mm = MESSAGE_BLOCK.exec(xml)) !== null) {
+    const a = attrs(mm[1] ?? mm[3] ?? '');
+    if (!a.msgtype || !a.name) continue;
+    messages.set(a.msgtype, a.name);
+
+    const body = mm[2];
+    if (body) {
+      const reqTags: number[] = [];
+      FIELD_REF.lastIndex = 0;
+      let fr: RegExpExecArray | null;
+      const topLevel = stripGroups(body);
+      while ((fr = FIELD_REF.exec(topLevel)) !== null) {
+        const fa = attrs(fr[1] ?? '');
+        if (fa.required === 'Y' && fa.name) {
+          const tag = byName.get(fa.name);
+          if (tag !== undefined) reqTags.push(tag);
+        }
+      }
+      if (reqTags.length) required.set(a.msgtype, reqTags);
+    }
   }
 
-  return { byTag, byName, messages };
+  return { byTag, byName, messages, groups, required };
 }
 
 /** A built-in dictionary assembled from the bundled {@link Tag} constants. */
@@ -85,7 +182,58 @@ export function builtinDictionary(): Dictionary {
     byTag.set(tag, { tag, name, type: 'STRING' });
     byName.set(name, tag);
   }
-  return { byTag, byName, messages: new Map() };
+  return { byTag, byName, messages: new Map(), groups: new Map(), required: new Map() };
+}
+
+/**
+ * Extract the entries of a repeating group from a message. Each entry is returned
+ * as a {@link FixMessage} so you can `.get(tag)` its fields. Requires a dictionary
+ * that knows the group (see {@link parseDictionary}); falls back to delimiting by
+ * the first field after the count when the group is unknown.
+ *
+ * ponytail: nested sub-groups are flattened into their parent entry's fields.
+ */
+export function getGroups(msg: FixMessage, countTag: number, dict: Dictionary): FixMessage[] {
+  const fields = msg.fields;
+  const idx = fields.findIndex(([t]) => t === countTag);
+  if (idx === -1) return [];
+  const count = Number(fields[idx]?.[1]);
+  if (!Number.isInteger(count) || count <= 0) return [];
+
+  const spec = dict.groups.get(countTag);
+  const memberSet = spec ? new Set(spec.memberTags) : null;
+  const delim = spec ? spec.delimiterTag : fields[idx + 1]?.[0];
+  if (delim === undefined) return [];
+
+  const entries: Field[][] = [];
+  let cur: Field[] | null = null;
+  for (let i = idx + 1; i < fields.length; i++) {
+    const field = fields[i];
+    if (field === undefined) break;
+    const [t] = field;
+    if (t === delim) {
+      if (entries.length >= count) break;
+      cur = [field];
+      entries.push(cur);
+    } else if (cur && (!memberSet || memberSet.has(t))) {
+      cur.push(field);
+    } else {
+      break;
+    }
+  }
+  return entries.map((e) => new FixMessage(e));
+}
+
+/**
+ * Build the fields for an outbound repeating group: the count field followed by
+ * each entry's fields in order. Splice the result into a message body.
+ *
+ * @example group(Tag.NoRelatedSym, [[[Tag.Symbol, 'BTC/USD']], [[Tag.Symbol, 'ETH/USD']]])
+ */
+export function group(countTag: number, entries: Field[][]): Field[] {
+  const out: Field[] = [[countTag, String(entries.length)]];
+  for (const entry of entries) out.push(...entry);
+  return out;
 }
 
 /**

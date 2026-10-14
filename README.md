@@ -171,11 +171,18 @@ with `Side` / `OrdType` / `TimeInForce`.
   **SequenceReset / gap-fill** handling.
 - **Resend / replay** - application messages are retained and retransmitted with
   `PossDupFlag` + `OrigSendingTime` on request; admin runs are gap-filled.
-- **Validation** - CompID checks and a session-level `Reject` for malformed
-  messages.
+- **Validation** - CompID, BeginString and required-tag checks with a
+  session-level `Reject`, plus optional dictionary-driven required-field
+  validation of application messages (`dictionary` + `validateRequired`).
+- **Repeating groups** - `getGroups(msg, countTag, dict)` extracts group entries;
+  `group(countTag, entries)` builds them for outbound messages.
+- **Authentication** - Username / Password / RawData on logon, and an acceptor
+  `authenticate` callback to gate who may connect.
+- **Multi-counterparty acceptor** - omit `targetCompId` to accept any initiator
+  and learn its CompID from the Logon.
 - **Resilience** - automatic reconnect with exponential backoff.
-- **Pluggable persistence** - in-memory by default; `FileStore` for sequence
-  numbers across restarts, or bring your own `SeqStore` / `MessageStore`.
+- **Pluggable persistence** - in-memory by default; `FileStore` / `FileMessageStore`
+  persist across restarts, or bring your own `SeqStore` / `MessageStore`.
 
 The session edge cases are the whole point, so they're tested:
 
@@ -200,20 +207,23 @@ npm test
 
 ## Roadmap
 
-Shipped in v0.2:
+Shipped:
 
-- [x] Persistent `MessageStore` (`FileMessageStore`) so resend/replay survives a restart
-- [x] Acceptor (server) side of the session
-- [x] FIX 4.2 and 5.0 / FIXT.1.1
+- [x] Acceptor (server) side, FIX 4.2 / 4.4 / 5.0 (FIXT.1.1)
+- [x] Persistent `FileMessageStore` so resend/replay survives a restart
 - [x] Dictionary parser + codegen (`parseDictionary`, `scripts/generate.ts`)
-- [x] Inbound required-tag validation (BeginString, SendingTime, MsgSeqNum)
+- [x] Inbound validation (checksum, CompID, BeginString, SendingTime, MsgSeqNum)
+- [x] Repeating-group parsing (`getGroups`) and the outbound `group()` builder
+- [x] Multi-counterparty acceptor routing (omit `targetCompId`, learn from Logon)
+- [x] Message-level required-field validation driven by the dictionary
+- [x] Logon authentication: Username / Password / RawData, and an acceptor `authenticate` gate
 
 Next, in rough order:
 
-- [ ] Repeating-group aware parsing and typed builders
-- [ ] Multi-counterparty routing on the acceptor (dynamic CompID validation)
-- [ ] Message-level required-field validation driven by the dictionary
-- [ ] Logon authentication helpers (Username/Password, RawData)
+- [ ] Component (`<component>`) expansion in the dictionary
+- [ ] Nested repeating groups preserved as structure, not flattened
+- [ ] Dictionary-driven outbound message validation
+- [ ] Mutual-TLS helpers and encryption (EncryptMethod) support
 
 ## Contributing
 

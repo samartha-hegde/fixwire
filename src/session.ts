@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import type { Socket } from 'node:net';
 import { MsgType, Tag } from './constants.js';
+import type { Dictionary } from './dictionary.js';
 import { encode, type Field, type FixMessage, FixParser, isChecksumValid } from './message.js';
 import { MemoryMessageStore, MemoryStore, type MessageStore, type SeqStore } from './store.js';
 import { connect as openSocket, type TransportOptions } from './transport.js';
@@ -37,6 +38,21 @@ export interface SessionConfig {
   store?: SeqStore;
   /** Outbound message store for resend/replay, default in-memory. */
   messageStore?: MessageStore;
+  /** Username (553) sent on Logon. */
+  username?: string;
+  /** Password (554) sent on Logon. */
+  password?: string;
+  /** RawData (96) sent on Logon; RawDataLength (95) is computed. */
+  rawData?: string;
+  /** FIX dictionary; enables {@link validateRequired} and dictionary-aware tooling. */
+  dictionary?: Dictionary;
+  /** Validate that inbound application messages carry their required fields (needs `dictionary`). */
+  validateRequired?: boolean;
+  /**
+   * Acceptor only: validate an inbound Logon (credentials, CompID) and return
+   * false to reject it. Set by {@link Acceptor}; not used by initiators.
+   */
+  authenticate?: (logon: FixMessage) => boolean;
 }
 
 type State = 'disconnected' | 'connecting' | 'logon-sent' | 'active' | 'logout-sent';
@@ -92,9 +108,32 @@ export interface Session {
  */
 export class Session extends EventEmitter {
   private readonly cfg: Required<
-    Omit<SessionConfig, 'tls' | 'store' | 'messageStore' | 'reconnect' | 'defaultApplVerId'>
+    Omit<
+      SessionConfig,
+      | 'tls'
+      | 'store'
+      | 'messageStore'
+      | 'reconnect'
+      | 'defaultApplVerId'
+      | 'username'
+      | 'password'
+      | 'rawData'
+      | 'dictionary'
+      | 'validateRequired'
+      | 'authenticate'
+    >
   > &
-    Pick<SessionConfig, 'tls' | 'defaultApplVerId'>;
+    Pick<
+      SessionConfig,
+      | 'tls'
+      | 'defaultApplVerId'
+      | 'username'
+      | 'password'
+      | 'rawData'
+      | 'dictionary'
+      | 'validateRequired'
+      | 'authenticate'
+    >;
   private readonly reconnectCfg: ReconnectOptions | null;
   private readonly store: SeqStore;
   private readonly messages: MessageStore;
@@ -125,6 +164,12 @@ export class Session extends EventEmitter {
       defaultApplVerId: config.defaultApplVerId,
       heartBtInt: config.heartBtInt ?? 30,
       resetOnLogon: config.resetOnLogon ?? false,
+      username: config.username,
+      password: config.password,
+      rawData: config.rawData,
+      dictionary: config.dictionary,
+      validateRequired: config.validateRequired,
+      authenticate: config.authenticate,
     };
     this.reconnectCfg = config.reconnect
       ? typeof config.reconnect === 'object'
@@ -239,8 +284,19 @@ export class Session extends EventEmitter {
     if (this.cfg.beginString.startsWith('FIXT') && this.cfg.defaultApplVerId !== undefined) {
       body.push([Tag.DefaultApplVerID, this.cfg.defaultApplVerId]);
     }
+    this.appendCredentials(body);
     this.state = 'logon-sent';
     this.sendRaw(MsgType.Logon, body);
+  }
+
+  /** Append Username/Password/RawData logon credentials, if configured. */
+  private appendCredentials(body: Field[]): void {
+    if (this.cfg.rawData !== undefined) {
+      body.push([Tag.RawDataLength, String(this.cfg.rawData.length)]);
+      body.push([Tag.RawData, this.cfg.rawData]);
+    }
+    if (this.cfg.username !== undefined) body.push([Tag.Username, this.cfg.username]);
+    if (this.cfg.password !== undefined) body.push([Tag.Password, this.cfg.password]);
   }
 
   private sendHeartbeat(testReqId?: string): void {
@@ -401,7 +457,7 @@ export class Session extends EventEmitter {
         this.emit('reject', msg);
         break;
       default:
-        this.emit('app', msg);
+        if (this.checkRequired(msg, type)) this.emit('app', msg);
         break;
     }
   }
@@ -409,21 +465,58 @@ export class Session extends EventEmitter {
   private compIdsMatch(msg: FixMessage): boolean {
     const sender = msg.get(Tag.SenderCompID);
     const target = msg.get(Tag.TargetCompID);
-    if (sender !== undefined && sender !== this.cfg.targetCompId) return false;
+    // Skip the sender check until a multi-counterparty acceptor learns the CompID.
+    if (sender !== undefined && this.cfg.targetCompId !== '' && sender !== this.cfg.targetCompId) {
+      return false;
+    }
     if (target !== undefined && target !== this.cfg.senderCompId) return false;
     return true;
   }
 
+  /** Dictionary-driven required-field check for an application message. */
+  private checkRequired(msg: FixMessage, msgType: string): boolean {
+    if (!this.cfg.validateRequired || !this.cfg.dictionary) return true;
+    const req = this.cfg.dictionary.required.get(msgType);
+    if (!req) return true;
+    for (const tag of req) {
+      if (msg.get(tag) === undefined) {
+        this.sendReject(msg.seqNum, `missing required field ${tag} for ${msgType}`, {
+          reason: Session.REQUIRED_TAG_MISSING,
+          refTagId: tag,
+        });
+        return false;
+      }
+    }
+    return true;
+  }
+
   private onLogon(msg: FixMessage): void {
-    if (this.role === 'acceptor') this.acceptLogon(msg);
+    if (this.role === 'acceptor' && !this.acceptLogon(msg)) return; // rejected
     this.state = 'active';
     this.reconnectAttempts = 0;
     this.startTimers();
     this.emit('logon', msg);
   }
 
-  /** Acceptor-side logon: adopt the initiator's terms and reply with our Logon. */
-  private acceptLogon(msg: FixMessage): void {
+  /**
+   * Acceptor-side logon: authenticate and learn the counterparty, adopt the
+   * initiator's terms, and reply with our Logon. Returns false if rejected.
+   */
+  private acceptLogon(msg: FixMessage): boolean {
+    const sender = msg.get(Tag.SenderCompID);
+    // Enforce a configured counterparty, or learn it (multi-counterparty acceptor).
+    if (this.cfg.targetCompId !== '' && sender !== undefined && sender !== this.cfg.targetCompId) {
+      this.sendLogout('unknown counterparty');
+      this.disconnect();
+      return false;
+    }
+    if (this.cfg.authenticate && !this.cfg.authenticate(msg)) {
+      this.sendLogout('authentication failed');
+      this.disconnect();
+      return false;
+    }
+    if (sender !== undefined) this.cfg.targetCompId = sender; // learn or confirm
+
     const reset = msg.get(Tag.ResetSeqNumFlag) === 'Y';
     const hb = msg.getInt(Tag.HeartBtInt);
     if (hb !== undefined && hb > 0) this.cfg.heartBtInt = hb;
@@ -440,6 +533,7 @@ export class Session extends EventEmitter {
       body.push([Tag.DefaultApplVerID, this.cfg.defaultApplVerId]);
     }
     this.sendRaw(MsgType.Logon, body);
+    return true;
   }
 
   private onLogout(msg: FixMessage): void {

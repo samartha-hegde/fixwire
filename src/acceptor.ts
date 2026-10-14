@@ -1,14 +1,20 @@
 import { EventEmitter } from 'node:events';
 import * as net from 'node:net';
 import * as tls from 'node:tls';
+import type { Dictionary } from './dictionary.js';
+import type { FixMessage } from './message.js';
 import { Session } from './session.js';
 import { MemoryMessageStore, MemoryStore, type MessageStore, type SeqStore } from './store.js';
 
 export interface AcceptorConfig {
   /** Our CompID (the acceptor). */
   senderCompId: string;
-  /** The expected initiator's CompID. Inbound messages are validated against it. */
-  targetCompId: string;
+  /**
+   * The expected initiator's CompID. Inbound messages are validated against it.
+   * Omit to accept any counterparty and learn its CompID from the Logon
+   * (combine with `authenticate` to gate who may connect).
+   */
+  targetCompId?: string;
   port: number;
   host?: string;
   /** TLS server options (key/cert). Omit for plain TCP. */
@@ -19,6 +25,12 @@ export interface AcceptorConfig {
   defaultApplVerId?: string;
   /** Fallback heartbeat interval if the initiator does not specify one. */
   heartBtInt?: number;
+  /** Validate an inbound Logon (credentials, CompID). Return false to reject. */
+  authenticate?: (logon: FixMessage) => boolean;
+  /** FIX dictionary shared across connections (enables `validateRequired`). */
+  dictionary?: Dictionary;
+  /** Validate inbound application messages against the dictionary's required fields. */
+  validateRequired?: boolean;
   /** Factory for a fresh sequence store per connection. Default: in-memory. */
   createStore?: () => SeqStore;
   /** Factory for a fresh message store per connection. Default: in-memory. */
@@ -88,12 +100,15 @@ export class Acceptor extends EventEmitter {
   private onConnection(socket: net.Socket): void {
     const session = new Session({
       senderCompId: this.cfg.senderCompId,
-      targetCompId: this.cfg.targetCompId,
+      targetCompId: this.cfg.targetCompId ?? '', // empty => learn from Logon
       host: '', // unused: the socket is already connected
       port: 0,
       beginString: this.cfg.beginString,
       defaultApplVerId: this.cfg.defaultApplVerId,
       heartBtInt: this.cfg.heartBtInt,
+      authenticate: this.cfg.authenticate,
+      dictionary: this.cfg.dictionary,
+      validateRequired: this.cfg.validateRequired,
       store: (this.cfg.createStore ?? (() => new MemoryStore()))(),
       messageStore: (this.cfg.createMessageStore ?? (() => new MemoryMessageStore()))(),
     });

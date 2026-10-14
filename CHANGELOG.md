@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-14
+
+### Added
+
+- **Repeating groups**: `getGroups(msg, countTag, dict)` extracts group entries
+  (dictionary-driven, handles nested groups innermost-out), and `group(countTag,
+  entries)` builds them for outbound messages.
+- **Dictionary**: `parseDictionary` now extracts repeating-group structure
+  (`GroupSpec`) and per-message required fields.
+- **Message-level validation**: `dictionary` + `validateRequired` on a session
+  rejects inbound application messages that are missing required fields.
+- **Logon authentication**: `username`, `password` and `rawData` session options
+  send Username (553) / Password (554) / RawData (95/96); the `Acceptor` gains an
+  `authenticate(logon)` callback to reject unauthorized logons.
+- **Multi-counterparty acceptor**: omit `targetCompId` on the `Acceptor` to accept
+  any initiator and learn its CompID from the Logon.
+
 ## [0.2.0] - 2026-10-14
 
 Completes the v0.1 roadmap: acceptor side, more FIX versions, persistent
@@ -54,6 +71,7 @@ Initial public release. FIX 4.4, initiator (client) side.
 - `newOrderSingle` builder with `Side` / `OrdType` / `TimeInForce` constants.
 - TCP and TLS transport.
 
-[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/samartha-hegde/fixwire/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/samartha-hegde/fixwire/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/samartha-hegde/fixwire/releases/tag/v0.1.0

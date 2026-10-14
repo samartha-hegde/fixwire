@@ -23,6 +23,11 @@ export const Tag = {
   // FIXT.1.1 / FIX 5.x application version
   DefaultApplVerID: 1137,
   ApplVerID: 1128,
+  // Logon authentication
+  RawDataLength: 95,
+  RawData: 96,
+  Username: 553,
+  Password: 554,
   BeginSeqNo: 7,
   EndSeqNo: 16,
   NewSeqNo: 36,

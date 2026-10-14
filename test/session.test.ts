@@ -8,6 +8,7 @@ import {
   FixParser,
   MsgType,
   parse,
+  parseDictionary,
   Session,
   SOH,
   Tag,
@@ -397,6 +398,54 @@ test('FIXT.1.1 logon carries BeginString and DefaultApplVerID', async () => {
   });
   assert.equal(logon.get(Tag.BeginString), 'FIXT.1.1');
   assert.equal(logon.get(Tag.DefaultApplVerID), '9');
+  session.disconnect();
+  acc.close();
+});
+
+test('logon carries Username and Password credentials', async () => {
+  const acc = await startAcceptor(() => {});
+  const session = newSession(acc.port, { username: 'desk-a', password: 's3cret' });
+  const logon = await new Promise<ReturnType<typeof parse>>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('sent', (w) => {
+      const m = parse(w);
+      if (m.msgType === MsgType.Logon) resolve(m);
+    });
+    session.connect();
+  });
+  assert.equal(logon.get(Tag.Username), 'desk-a');
+  assert.equal(logon.get(Tag.Password), 's3cret');
+  session.disconnect();
+  acc.close();
+});
+
+test('rejects an application message missing a dictionary-required field', async () => {
+  const dict = parseDictionary(
+    `<fix><messages><message name="ExecutionReport" msgtype="8" msgcat="app">
+       <field name="ClOrdID" required="Y"/></message></messages>
+     <fields><field number="11" name="ClOrdID" type="STRING"/></fields></fix>`,
+  );
+  const acc = await startAcceptor((msg, send) => {
+    if (msg.msgType === MsgType.Logon) {
+      replyLogon(send);
+      send(MsgType.ExecutionReport, [[Tag.OrdStatus, '0']]); // missing ClOrdID (11)
+    }
+  });
+  const session = newSession(acc.port, { dictionary: dict, validateRequired: true });
+  let appSeen = false;
+  session.on('app', () => {
+    appSeen = true;
+  });
+  const reject = await new Promise<ReturnType<typeof parse>>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('sent', (w) => {
+      const m = parse(w);
+      if (m.msgType === MsgType.Reject) resolve(m);
+    });
+    session.connect();
+  });
+  assert.equal(reject.get(Tag.RefTagID), String(Tag.ClOrdID));
+  assert.equal(appSeen, false, 'invalid app message must not be delivered');
   session.disconnect();
   acc.close();
 });

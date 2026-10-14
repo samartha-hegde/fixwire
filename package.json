@@ -1,6 +1,6 @@
 {
   "name": "fixwire",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A modern, fully-typed FIX protocol engine for TypeScript. Correct session layer, zero dependencies, great DX.",
   "type": "module",
   "license": "MIT",

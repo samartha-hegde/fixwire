@@ -100,3 +100,77 @@ test('acceptor logs out an initiator whose first message is not a Logon', async 
   sock.destroy();
   acceptor.close();
 });
+
+test('acceptor rejects a logon that fails authentication', async () => {
+  const acceptor = new Acceptor({
+    senderCompId: 'SERVER',
+    targetCompId: 'CLIENT',
+    host: '127.0.0.1',
+    port: 0,
+    authenticate: (logon) => logon.get(Tag.Password) === 'secret',
+  });
+  await new Promise<void>((resolve) => {
+    acceptor.on('listening', resolve);
+    acceptor.listen();
+  });
+
+  const client = new Session({
+    senderCompId: 'CLIENT',
+    targetCompId: 'SERVER',
+    host: '127.0.0.1',
+    port: acceptor.port!,
+    resetOnLogon: true,
+    password: 'wrong',
+  });
+  const logout = await new Promise<FixMessage>((resolve, reject) => {
+    client.on('logon', () => reject(new Error('should not have logged on')));
+    client.on('logout', resolve);
+    client.connect();
+  });
+  assert.match(logout.get(Tag.Text) ?? '', /authentication/);
+  client.disconnect();
+  acceptor.close();
+});
+
+test('acceptor without targetCompId accepts any initiator and learns its CompID', async () => {
+  const acceptor = new Acceptor({
+    senderCompId: 'SERVER',
+    host: '127.0.0.1',
+    port: 0, // no targetCompId => accept any
+  });
+  let learned: string | undefined;
+  acceptor.on('session', (s: SessionType) => {
+    s.on('logon', (m) => {
+      learned = m.get(Tag.SenderCompID);
+    });
+    s.on('app', (m) => {
+      if (m.msgType === MsgType.NewOrderSingle) {
+        s.send(MsgType.ExecutionReport, [[Tag.ClOrdID, m.get(Tag.ClOrdID) ?? '']]);
+      }
+    });
+  });
+  await new Promise<void>((resolve) => {
+    acceptor.on('listening', resolve);
+    acceptor.listen();
+  });
+
+  const client = new Session({
+    senderCompId: 'DESK-A',
+    targetCompId: 'SERVER',
+    host: '127.0.0.1',
+    port: acceptor.port!,
+    resetOnLogon: true,
+  });
+  const exec = await new Promise<FixMessage>((resolve, reject) => {
+    client.on('error', reject);
+    client.on('logon', () => client.send(MsgType.NewOrderSingle, [[Tag.ClOrdID, 'order-1']]));
+    client.on('app', (m) => {
+      if (m.msgType === MsgType.ExecutionReport) resolve(m);
+    });
+    client.connect();
+  });
+  assert.equal(learned, 'DESK-A', 'acceptor learns the CompID from the logon');
+  assert.equal(exec.get(Tag.ClOrdID), 'order-1');
+  client.disconnect();
+  acceptor.close();
+});
