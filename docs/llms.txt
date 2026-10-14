@@ -1,0 +1,118 @@
+# fixwire
+
+> A modern, fully-typed FIX protocol engine for TypeScript. Zero runtime
+> dependencies, a correct session layer (resend, gap-fill, sequence-reset,
+> reconnect), both initiator and acceptor, FIX 4.2 / 4.4 / 5.0 (FIXT.1.1).
+> Published on npm as `fixwire`. ESM only, Node 20+.
+
+fixwire handles the FIX session layer; you handle application messages through
+events and `[tag, value]` field arrays (or the provided builders). It is
+interop-verified against quickfixgo (Go), QuickFIX (C++), and QuickFIX/J (Java).
+
+## Install
+
+`npm install fixwire` — ESM only, use `import`, not `require`.
+
+## Initiator (client)
+
+```ts
+import { Session, MsgType, Tag, newOrderSingle, Side, OrdType } from 'fixwire';
+
+const session = new Session({
+  senderCompId: 'CLIENT',
+  targetCompId: 'VENUE',
+  host: 'fix.venue.com',
+  port: 9876,
+  tls: true, // or { ca, cert, key, servername }
+  resetOnLogon: true,
+  reconnect: true,
+});
+
+session.on('logon', () => {
+  session.send(
+    MsgType.NewOrderSingle,
+    newOrderSingle({
+      clOrdId: 'o-1',
+      symbol: 'BTC/USD',
+      side: Side.Buy,
+      orderQty: 1,
+      ordType: OrdType.Limit,
+      price: 65000,
+    }),
+  );
+});
+
+session.on('app', (msg) => {
+  if (msg.msgType === MsgType.ExecutionReport) {
+    console.log(msg.get(Tag.ClOrdID), msg.get(Tag.OrdStatus));
+  }
+});
+
+session.connect();
+```
+
+## Acceptor (server)
+
+```ts
+import { Acceptor, MsgType, Tag } from 'fixwire';
+
+const acceptor = new Acceptor({ senderCompId: 'SERVER', targetCompId: 'CLIENT', port: 9876 });
+acceptor.on('session', (session) => {
+  session.on('app', (msg) => {
+    if (msg.msgType === MsgType.NewOrderSingle) {
+      session.send(MsgType.ExecutionReport, [
+        [Tag.ClOrdID, msg.get(Tag.ClOrdID) ?? ''],
+        [Tag.ExecType, '0'],
+        [Tag.OrdStatus, '0'],
+      ]);
+    }
+  });
+});
+acceptor.listen();
+// Omit `targetCompId` to accept any initiator (multi-counterparty) and learn its
+// CompID from the Logon. Add `authenticate: (logon) => boolean` to gate connections.
+```
+
+## Events (all typed)
+
+`connect`, `logon`, `app` (in-sequence application message), `message` (every
+inbound), `sent` (wire string), `reject`, `reconnecting`, `logout`, `close`,
+`error`.
+
+## Key APIs
+
+- `new Session(config)` — initiator. Config: `senderCompId`, `targetCompId`, `host`,
+  `port`, `tls?`, `beginString?` (default `FIX.4.4`; use `FIXT.1.1` for 5.x with
+  `defaultApplVerId`), `heartBtInt?`, `resetOnLogon?`, `reconnect?`, `store?`,
+  `messageStore?`, `username?` / `password?` / `rawData?`, `dictionary?` +
+  `validateRequired?`. Methods: `connect()`, `send(msgType, fields)`, `logout()`,
+  `disconnect()`, `status`.
+- `new Acceptor(config)` — server. Like Session, plus `authenticate?(logon) => boolean`;
+  omit `targetCompId` to accept any. Emits `listening` and `session` (per connection).
+- `FixMessage` — `msg.get(tag)`, `msg.getInt(tag)`, `msg.msgType`, `msg.seqNum`, `msg.fields`.
+- Codec — `encode(fields, beginString?)`, `parse(raw)`, `checksum`, `isChecksumValid`,
+  `FixParser` (streaming).
+- Dictionary — `parseDictionary(xml)` returns `{ byTag, byName, messages, groups, required }`;
+  `describe(msg, dict)` for readable logs; `getGroups(msg, countTag, dict)` extracts
+  repeating-group entries; `group(countTag, entries)` builds them outbound.
+- Stores — `MemoryStore` / `FileStore` (sequence numbers); `MemoryMessageStore` /
+  `FileMessageStore` (resend/replay).
+- Builders & constants — `newOrderSingle`, `Side`, `OrdType`, `TimeInForce`, `ApplVerID`,
+  `Tag`, `MsgType`, `SOH`.
+
+## Gotchas
+
+- ESM only: `import`, not `require`.
+- Fields are `[number, string]` tuples. `send(msgType, fields)` fields EXCLUDE the
+  header (8/9/35/34/49/56/52) and trailer (10); the Session adds and sequences them.
+- NewOrderSingle usually needs `TransactTime` (60); FIX 4.2 also requires `HandlInst` (21).
+- FIX 5.0: set `beginString: 'FIXT.1.1'` and `defaultApplVerId` (e.g. `'9'` for 5.0 SP2).
+- `resetOnLogon: true` resets sequence numbers at the start of each session.
+
+## Links
+
+- README: https://raw.githubusercontent.com/samartha-hegde/fixwire/main/README.md
+- Examples: https://github.com/samartha-hegde/fixwire/tree/main/examples
+- Interop tests: https://github.com/samartha-hegde/fixwire/tree/main/examples/interop
+- Changelog: https://raw.githubusercontent.com/samartha-hegde/fixwire/main/CHANGELOG.md
+- npm: https://www.npmjs.com/package/fixwire

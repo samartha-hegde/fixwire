@@ -242,6 +242,21 @@ Next, in rough order:
 - [ ] Dictionary-driven outbound message validation
 - [ ] Mutual-TLS helpers and encryption (EncryptMethod) support
 
+## Using fixwire with AI assistants
+
+fixwire ships machine-readable usage docs so AI coding tools can integrate it
+correctly on their own:
+
+- **`llms.txt`** ([llmstxt.org](https://llmstxt.org) format):
+  <https://samartha-hegde.github.io/fixwire/llms.txt> — a concise, tool-agnostic
+  usage reference (API shapes, recipes, gotchas) any AI tool can pull.
+- **Claude Code skill**: [`skills/fixwire/SKILL.md`](./skills/fixwire/SKILL.md).
+  Copy it into your project's `.claude/skills/fixwire/` (or `~/.claude/skills/`)
+  and Claude Code will know how to wire up initiators, acceptors, and sessions.
+
+Combined with the shipped `.d.ts` types and JSDoc, an assistant has everything it
+needs to build a correct FIX integration.
+
 ## Contributing
 
 Contributions welcome - see [CONTRIBUTING.md](./CONTRIBUTING.md). The project has
