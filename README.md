@@ -1,9 +1,14 @@
 # fixwire
 
 [![CI](https://github.com/samartha-hegde/fixwire/actions/workflows/ci.yml/badge.svg)](https://github.com/samartha-hegde/fixwire/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
+
+<!-- Add these back after the first npm publish (they read live data from the npm registry):
 [![npm](https://img.shields.io/npm/v/fixwire.svg)](https://www.npmjs.com/package/fixwire)
-[![license](https://img.shields.io/npm/l/fixwire.svg)](./LICENSE)
-[![node](https://img.shields.io/node/v/fixwire.svg)](https://nodejs.org)
+[![downloads](https://img.shields.io/npm/dm/fixwire.svg)](https://www.npmjs.com/package/fixwire)
+-->
+
 
 A modern, fully-typed **FIX protocol** engine for TypeScript. **Zero runtime
 dependencies**, a correct session layer, and an API that feels like 2026 - not a
