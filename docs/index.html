@@ -407,6 +407,34 @@
   .test-term .summ { color: var(--pass); margin-top: 12px; display: block; }
   .test-term .muted { color: var(--faint); }
 
+  /* ---------- interop ---------- */
+  .interop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .interop-card {
+    background: linear-gradient(180deg, var(--panel), var(--ground-2));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px 26px;
+  }
+  .interop-card .k {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 8px;
+  }
+  .interop-card .row {
+    display: grid;
+    grid-template-columns: 1fr auto 20px;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+  }
+  .interop-card .name { font-weight: 600; }
+  .interop-card .lang { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+  .interop-card .ok { color: var(--pass); font-weight: 700; text-align: right; }
+
   /* ---------- cta / footer ---------- */
   .cta-band {
     border: 1px solid var(--line-strong);
@@ -444,6 +472,7 @@
     .stat:nth-child(3) { border-right: none; }
     .stat:nth-child(n+4) { border-top: 1px solid var(--line); }
     .why-grid { grid-template-columns: 1fr; }
+    .interop-grid { grid-template-columns: 1fr; }
     .feat-grid { grid-template-columns: repeat(2, 1fr); }
     .proof-grid { grid-template-columns: 1fr; gap: 28px; }
   }
@@ -466,6 +495,7 @@
       <a href="#why" class="hide-sm">Why</a>
       <a href="#code" class="hide-sm">Code</a>
       <a href="#features" class="hide-sm">Features</a>
+      <a href="#interop" class="hide-sm">Interop</a>
       <a href="https://github.com/samartha-hegde/fixwire">GitHub</a>
       <a class="nav-cta" href="https://github.com/samartha-hegde/fixwire">npm i fixwire</a>
     </nav>
@@ -515,7 +545,7 @@
     <div class="stats wrap" style="margin-top:72px;">
       <div class="stats-grid">
         <div class="stat"><div class="n">0</div><div class="l">runtime deps</div></div>
-        <div class="stat"><div class="n">25</div><div class="l">tests passing</div></div>
+        <div class="stat"><div class="n">33</div><div class="l">tests passing</div></div>
         <div class="stat"><div class="n">3</div><div class="l">FIX versions</div></div>
         <div class="stat"><div class="n">2</div><div class="l">session roles</div></div>
         <div class="stat"><div class="n">MIT</div><div class="l">licensed</div></div>
@@ -687,8 +717,36 @@ session.on('message', (msg) => {
           <span class="pass">rejects a message missing SendingTime</span><br />
           <span class="pass">FIXT.1.1 logon carries DefaultApplVerID</span><br />
           <span class="pass">acceptor and initiator complete a full round-trip</span><br />
-          <span class="muted">  ... and 16 more</span>
-          <span class="summ">&#10003; 25 passing &middot; 0 failing</span>
+          <span class="muted">  ... and 24 more</span>
+          <span class="summ">&#10003; 33 passing &middot; 0 failing</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="interop" style="padding-top:24px;">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Interoperability</p>
+        <h2 class="sec-title">Proven against the engines the market actually runs.</h2>
+        <p>
+          fixwire logs on, trades, and logs out against independent, production FIX engines,
+          passing their strict data-dictionary validation. Different codebases, different
+          languages, no shared heritage with fixwire. It is verified across protocol versions too.
+        </p>
+      </div>
+      <div class="interop-grid reveal">
+        <div class="interop-card">
+          <div class="k">Engine</div>
+          <div class="row"><span class="name">quickfixgo</span><span class="lang">Go</span><span class="ok">&#10003;</span></div>
+          <div class="row"><span class="name">QuickFIX</span><span class="lang">C++</span><span class="ok">&#10003;</span></div>
+          <div class="row"><span class="name">QuickFIX/J</span><span class="lang">Java</span><span class="ok">&#10003;</span></div>
+        </div>
+        <div class="interop-card">
+          <div class="k">Protocol version</div>
+          <div class="row"><span class="name">FIX 4.2</span><span class="lang">logon &#8594; fill</span><span class="ok">&#10003;</span></div>
+          <div class="row"><span class="name">FIX 4.4</span><span class="lang">logon &#8594; fill</span><span class="ok">&#10003;</span></div>
+          <div class="row"><span class="name">FIX 5.0 &middot; FIXT.1.1</span><span class="lang">logon &#8594; fill</span><span class="ok">&#10003;</span></div>
         </div>
       </div>
     </div>
