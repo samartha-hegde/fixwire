@@ -23,8 +23,9 @@ timeout, or socket error), so each `run.sh` is a pass/fail gate.
 
 | Engine | Language | Directory | Run |
 | ------ | -------- | --------- | --- |
-| [quickfixgo](https://github.com/quickfixgo/quickfix) | Go (C++ QuickFIX lineage) | `quickfixgo/` | `bash quickfixgo/run.sh` |
+| [quickfixgo](https://github.com/quickfixgo/quickfix) | Go | `quickfixgo/` | `bash quickfixgo/run.sh` |
 | [QuickFIX](https://github.com/quickfix/quickfix) | C++ (via Python bindings) | `quickfix-python/` | `bash quickfix-python/run.sh` |
+| [QuickFIX/J](https://github.com/quickfix-j/quickfixj) | Java | `quickfixj/` | `bash quickfixj/run.sh` |
 
 ## Running
 
@@ -51,6 +52,26 @@ python3 -m venv .venv
 .venv/bin/pip install quickfix        # compiles the C++ engine
 cd ..
 bash quickfix-python/run.sh
+```
+
+**QuickFIX/J** (needs a JDK):
+
+```bash
+# First run downloads the QuickFIX/J jars from Maven Central into quickfixj/lib,
+# then compiles and runs. No Maven or Gradle required.
+cd quickfixj
+mkdir -p lib && cd lib
+base=https://repo1.maven.org/maven2
+for j in \
+  org/quickfixj/quickfixj-core/2.3.1/quickfixj-core-2.3.1.jar \
+  org/quickfixj/quickfixj-messages-fix44/2.3.1/quickfixj-messages-fix44-2.3.1.jar \
+  org/apache/mina/mina-core/2.1.4/mina-core-2.1.4.jar \
+  org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar \
+  org/slf4j/slf4j-nop/1.7.36/slf4j-nop-1.7.36.jar ; do
+  curl -fsSLO "$base/$j"
+done
+cd ../..
+bash quickfixj/run.sh
 ```
 
 ## Notes

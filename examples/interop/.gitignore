@@ -5,3 +5,5 @@ FIX44.xml
 **/.venv/
 **/log/
 **/store/
+**/lib/
+**/*.class

@@ -216,6 +216,7 @@ different languages, no shared heritage with fixwire.
 | ------ | -------- | ------ |
 | [quickfixgo](https://github.com/quickfixgo/quickfix) | Go | logon → order → fill → logout |
 | [QuickFIX](https://github.com/quickfix/quickfix) | C++ (reference engine) | logon → order → fill → logout |
+| [QuickFIX/J](https://github.com/quickfix-j/quickfixj) | Java | logon → order → fill → logout |
 
 Run them yourself from [`examples/interop`](./examples/interop).
 
