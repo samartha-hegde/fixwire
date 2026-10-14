@@ -1,6 +1,6 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { encode, parse, checksum, isChecksumValid, FixParser, SOH, Tag } from '../src/index.js';
+import { test } from 'node:test';
+import { encode, FixParser, isChecksumValid, parse, SOH, Tag } from '../src/index.js';
 
 test('isChecksumValid accepts a real message and rejects a tampered one', () => {
   const wire = encode([
@@ -11,7 +11,7 @@ test('isChecksumValid accepts a real message and rejects a tampered one', () => 
   ]);
   assert.ok(isChecksumValid(wire));
   // Flip the checksum digits - must now be rejected.
-  const tampered = wire.slice(0, -4) + 'XXX' + SOH;
+  const tampered = `${wire.slice(0, -4)}XXX${SOH}`;
   assert.equal(isChecksumValid(tampered), false);
 });
 
@@ -30,7 +30,7 @@ test('checksum matches a known FIX vector', () => {
   assert.ok(wire.includes(`${SOH}9=65${SOH}`), 'BodyLength should be 65');
   assert.ok(
     wire.endsWith(`10=062${SOH}`),
-    `expected checksum 062, got: ${wire.replace(/\x01/g, '|')}`,
+    `expected checksum 062, got: ${wire.replaceAll(SOH, '|')}`,
   );
 });
 

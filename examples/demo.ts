@@ -6,7 +6,7 @@
  *   npm run demo
  */
 import * as net from 'node:net';
-import { Session, encode, FixParser, Tag, MsgType, type Field } from '../src/index.js';
+import { encode, type Field, FixParser, MsgType, Session, Tag } from '../src/index.js';
 
 // --- throwaway acceptor (demo only; fixwire is the initiator side) ----------
 const server = net.createServer((sock) => {

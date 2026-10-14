@@ -31,13 +31,12 @@ Run the full local gate - CI runs exactly these:
 
 ```bash
 npm run typecheck
-npm run lint
-npm run format:check
+npm run check     # Biome: lint + format + import order
 npm test
 npm run build
 ```
 
-`npm run format` auto-fixes formatting.
+`npm run check:fix` auto-fixes lint and formatting (Biome does both).
 
 ## What makes a good PR
 

@@ -20,11 +20,16 @@ export const Tag = {
   EncryptMethod: 98,
   TestReqID: 112,
   ResetSeqNumFlag: 141,
+  // FIXT.1.1 / FIX 5.x application version
+  DefaultApplVerID: 1137,
+  ApplVerID: 1128,
   BeginSeqNo: 7,
   EndSeqNo: 16,
   NewSeqNo: 36,
   GapFillFlag: 123,
   RefSeqNum: 45,
+  RefTagID: 371,
+  SessionRejectReason: 373,
   Text: 58,
 
   // Common application fields (NewOrderSingle / ExecutionReport)

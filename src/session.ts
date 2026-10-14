@@ -1,9 +1,9 @@
 import { EventEmitter } from 'node:events';
 import type { Socket } from 'node:net';
-import { Tag, MsgType } from './constants.js';
-import { FixMessage, FixParser, encode, isChecksumValid, type Field } from './message.js';
+import { MsgType, Tag } from './constants.js';
+import { encode, type Field, type FixMessage, FixParser, isChecksumValid } from './message.js';
+import { MemoryMessageStore, MemoryStore, type MessageStore, type SeqStore } from './store.js';
 import { connect as openSocket, type TransportOptions } from './transport.js';
-import { MemoryStore, MemoryMessageStore, type SeqStore, type MessageStore } from './store.js';
 
 export interface ReconnectOptions {
   /** Delay before the first retry, default 1000ms. */
@@ -20,8 +20,13 @@ export interface SessionConfig {
   host: string;
   port: number;
   tls?: TransportOptions['tls'];
-  /** FIX version string, default "FIX.4.4". */
+  /** FIX version string, default "FIX.4.4". Use "FIXT.1.1" for FIX 5.x. */
   beginString?: string;
+  /**
+   * DefaultApplVerID (1137) sent on Logon for FIXT.1.1 sessions, e.g. "9" for
+   * FIX 5.0 SP2. Required when `beginString` is "FIXT.1.1".
+   */
+  defaultApplVerId?: string;
   /** Heartbeat interval in seconds, default 30. */
   heartBtInt?: number;
   /** Send ResetSeqNumFlag (141=Y) on logon and reset local counters to 1. */
@@ -87,15 +92,16 @@ export interface Session {
  */
 export class Session extends EventEmitter {
   private readonly cfg: Required<
-    Omit<SessionConfig, 'tls' | 'store' | 'messageStore' | 'reconnect'>
+    Omit<SessionConfig, 'tls' | 'store' | 'messageStore' | 'reconnect' | 'defaultApplVerId'>
   > &
-    Pick<SessionConfig, 'tls'>;
+    Pick<SessionConfig, 'tls' | 'defaultApplVerId'>;
   private readonly reconnectCfg: ReconnectOptions | null;
   private readonly store: SeqStore;
   private readonly messages: MessageStore;
   private parser = new FixParser();
   private socket?: Socket;
   private state: State = 'disconnected';
+  private role: 'initiator' | 'acceptor' = 'initiator';
 
   private timer?: ReturnType<typeof setInterval>;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
@@ -116,6 +122,7 @@ export class Session extends EventEmitter {
       port: config.port,
       tls: config.tls,
       beginString: config.beginString ?? 'FIX.4.4',
+      defaultApplVerId: config.defaultApplVerId,
       heartBtInt: config.heartBtInt ?? 30,
       resetOnLogon: config.resetOnLogon ?? false,
     };
@@ -147,6 +154,22 @@ export class Session extends EventEmitter {
       this.sendLogon();
     };
     socket.once(this.cfg.tls ? 'secureConnect' : 'connect', ready);
+    socket.on('data', (chunk: Buffer) => this.onData(chunk.toString('latin1')));
+    socket.on('error', (err) => this.emit('error', err));
+    socket.on('close', () => this.onClose());
+  }
+
+  /**
+   * Run this session as an acceptor over an already-connected socket, waiting
+   * for the counterparty's Logon rather than initiating. Used by {@link Acceptor}.
+   * @internal
+   */
+  attach(socket: Socket): void {
+    this.role = 'acceptor';
+    this.intentionalClose = false;
+    this.state = 'connecting';
+    this.parser = new FixParser();
+    this.socket = socket;
     socket.on('data', (chunk: Buffer) => this.onData(chunk.toString('latin1')));
     socket.on('error', (err) => this.emit('error', err));
     socket.on('close', () => this.onClose());
@@ -212,6 +235,10 @@ export class Session extends EventEmitter {
       this.messages.reset();
       body.push([Tag.ResetSeqNumFlag, 'Y']);
     }
+    // FIXT.1.1 (FIX 5.x) logon must declare the default application version.
+    if (this.cfg.beginString.startsWith('FIXT') && this.cfg.defaultApplVerId !== undefined) {
+      body.push([Tag.DefaultApplVerID, this.cfg.defaultApplVerId]);
+    }
     this.state = 'logon-sent';
     this.sendRaw(MsgType.Logon, body);
   }
@@ -233,12 +260,21 @@ export class Session extends EventEmitter {
     ]);
   }
 
-  private sendReject(refSeqNum: number | undefined, text: string): void {
+  private sendReject(
+    refSeqNum: number | undefined,
+    text: string,
+    opts: { reason?: number; refTagId?: number } = {},
+  ): void {
     const body: Field[] = [];
     if (refSeqNum !== undefined) body.push([Tag.RefSeqNum, String(refSeqNum)]);
+    if (opts.refTagId !== undefined) body.push([Tag.RefTagID, String(opts.refTagId)]);
+    if (opts.reason !== undefined) body.push([Tag.SessionRejectReason, String(opts.reason)]);
     body.push([Tag.Text, text]);
     this.sendRaw(MsgType.Reject, body);
   }
+
+  /** SessionRejectReason: required tag missing. */
+  private static readonly REQUIRED_TAG_MISSING = 1;
 
   private sendLogout(text?: string): void {
     this.state = 'logout-sent';
@@ -272,7 +308,18 @@ export class Session extends EventEmitter {
     const seq = msg.seqNum;
 
     if (type === undefined) {
-      this.sendReject(seq, 'missing MsgType (35)');
+      this.sendReject(seq, 'missing MsgType (35)', {
+        reason: Session.REQUIRED_TAG_MISSING,
+        refTagId: Tag.MsgType,
+      });
+      return;
+    }
+
+    // BeginString must match the configured version; a mismatch is fatal.
+    const beginString = msg.get(Tag.BeginString);
+    if (beginString !== undefined && beginString !== this.cfg.beginString) {
+      this.sendLogout(`incorrect BeginString, expected ${this.cfg.beginString} got ${beginString}`);
+      this.disconnect();
       return;
     }
 
@@ -281,6 +328,35 @@ export class Session extends EventEmitter {
       this.sendLogout('CompID mismatch');
       this.disconnect();
       return;
+    }
+
+    // Required standard header tags.
+    if (msg.get(Tag.SendingTime) === undefined) {
+      this.sendReject(seq, 'missing SendingTime (52)', {
+        reason: Session.REQUIRED_TAG_MISSING,
+        refTagId: Tag.SendingTime,
+      });
+      return;
+    }
+    if (seq === undefined) {
+      this.sendReject(undefined, 'missing MsgSeqNum (34)', {
+        reason: Session.REQUIRED_TAG_MISSING,
+        refTagId: Tag.MsgSeqNum,
+      });
+      return;
+    }
+
+    // An acceptor's first message must be a Logon.
+    if (this.role === 'acceptor' && this.state === 'connecting' && type !== MsgType.Logon) {
+      this.sendLogout('expected Logon');
+      this.disconnect();
+      return;
+    }
+
+    // A Logon with ResetSeqNumFlag tells us the counterparty's sequence restarts
+    // at 1, so our inbound expectation resets before the gap check runs.
+    if (type === MsgType.Logon && msg.get(Tag.ResetSeqNumFlag) === 'Y') {
+      this.store.setIn(1);
     }
 
     // SequenceReset may legitimately jump the sequence; handle before the gap check.
@@ -339,10 +415,31 @@ export class Session extends EventEmitter {
   }
 
   private onLogon(msg: FixMessage): void {
+    if (this.role === 'acceptor') this.acceptLogon(msg);
     this.state = 'active';
     this.reconnectAttempts = 0;
     this.startTimers();
     this.emit('logon', msg);
+  }
+
+  /** Acceptor-side logon: adopt the initiator's terms and reply with our Logon. */
+  private acceptLogon(msg: FixMessage): void {
+    const reset = msg.get(Tag.ResetSeqNumFlag) === 'Y';
+    const hb = msg.getInt(Tag.HeartBtInt);
+    if (hb !== undefined && hb > 0) this.cfg.heartBtInt = hb;
+    if (reset) {
+      this.store.setOut(1);
+      this.messages.reset();
+    }
+    const body: Field[] = [
+      [Tag.EncryptMethod, '0'],
+      [Tag.HeartBtInt, String(this.cfg.heartBtInt)],
+    ];
+    if (reset) body.push([Tag.ResetSeqNumFlag, 'Y']);
+    if (this.cfg.beginString.startsWith('FIXT') && this.cfg.defaultApplVerId !== undefined) {
+      body.push([Tag.DefaultApplVerID, this.cfg.defaultApplVerId]);
+    }
+    this.sendRaw(MsgType.Logon, body);
   }
 
   private onLogout(msg: FixMessage): void {

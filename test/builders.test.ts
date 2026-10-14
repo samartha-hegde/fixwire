@@ -1,6 +1,6 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newOrderSingle, Side, OrdType, TimeInForce, Tag } from '../src/index.js';
+import { test } from 'node:test';
+import { newOrderSingle, OrdType, Side, Tag, TimeInForce } from '../src/index.js';
 
 test('newOrderSingle builds the expected fields', () => {
   const fields = newOrderSingle({

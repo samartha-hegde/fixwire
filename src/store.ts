@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { Field } from './message.js';
 
 /**
@@ -125,5 +125,44 @@ export class MemoryMessageStore implements MessageStore {
   }
   reset(): void {
     this.map.clear();
+  }
+}
+
+/**
+ * File-backed message store. Each sent message is appended as one JSON line, so
+ * resend/replay survives a restart. The file is read into memory on construction
+ * (later lines win, so a re-sent seq overrides an earlier one).
+ */
+export class FileMessageStore implements MessageStore {
+  private readonly map = new Map<number, StoredMessage>();
+  private readonly path: string;
+
+  constructor(path: string) {
+    this.path = path;
+    if (existsSync(path)) {
+      for (const line of readFileSync(path, 'utf8').split('\n')) {
+        if (!line) continue;
+        try {
+          const msg = JSON.parse(line) as StoredMessage;
+          this.map.set(msg.seq, msg);
+        } catch {
+          // Skip a torn/partial trailing line rather than crash.
+        }
+      }
+    }
+  }
+
+  put(msg: StoredMessage): void {
+    this.map.set(msg.seq, msg);
+    appendFileSync(this.path, `${JSON.stringify(msg)}\n`);
+  }
+
+  get(seq: number): StoredMessage | undefined {
+    return this.map.get(seq);
+  }
+
+  reset(): void {
+    this.map.clear();
+    writeFileSync(this.path, '');
   }
 }

@@ -9,10 +9,11 @@ A modern, fully-typed **FIX protocol** engine for TypeScript. **Zero runtime
 dependencies**, a correct session layer, and an API that feels like 2026 - not a
 Java port from 2004.
 
-> **Status: v0.1 (early but solid).** FIX 4.4, initiator (client) side. The
-> session state machine - logon, heartbeats, test requests, sequence tracking,
-> gap detection, **true resend/replay**, inbound validation and reconnect - is
-> implemented and tested. See the [Roadmap](#roadmap) for what's next.
+> **Status: v0.2 (solid).** FIX 4.2 / 4.4 / 5.0 (FIXT.1.1), both **initiator and
+> acceptor** sides. The session state machine - logon, heartbeats, test requests,
+> sequence tracking, gap detection, **true resend/replay** (with persistent
+> stores), inbound validation and reconnect - is implemented and tested across 25
+> cases. See the [Roadmap](#roadmap) for what's next.
 
 ## Why
 
@@ -80,6 +81,38 @@ npx tsx examples/venue.ts   # connect to a real venue (env-configured, read-only
 
 See [`examples/venue.ts`](./examples/venue.ts) for a safe starting template
 against a real counterparty.
+
+### Running an acceptor (server)
+
+```ts
+import { Acceptor, MsgType, Tag } from 'fixwire';
+
+const acceptor = new Acceptor({
+  senderCompId: 'SERVER',
+  targetCompId: 'CLIENT',
+  port: 9876,
+  // tls: { key, cert },  // for FIX-over-TLS
+});
+
+acceptor.on('session', (session) => {
+  // Wire handlers before the counterparty logs on.
+  session.on('app', (msg) => {
+    if (msg.msgType === MsgType.NewOrderSingle) {
+      session.send(MsgType.ExecutionReport, [
+        [Tag.ClOrdID, msg.get(Tag.ClOrdID) ?? ''],
+        [Tag.ExecType, '0'],
+        [Tag.OrdStatus, '0'],
+      ]);
+    }
+  });
+});
+
+acceptor.listen();
+```
+
+The acceptor runs the same validated session state machine as the initiator; it
+replies to Logon, adopts the initiator's heartbeat interval, and handles
+resend/gap-fill identically.
 
 ## API
 
@@ -165,18 +198,26 @@ npm test
 
 ## Roadmap
 
-v0.1 ships the 20% that covers most real integrations. Next, in rough order:
+Shipped in v0.2:
 
-- [ ] Persistent `MessageStore` so resend/replay survives a restart
-- [ ] Acceptor (server) side of the session
-- [ ] FIX 4.2 and 5.0 / FIXT
-- [ ] Dictionary-driven typed message builders from FIX XML
-- [ ] Inbound field/required-tag validation beyond checksum + CompID
+- [x] Persistent `MessageStore` (`FileMessageStore`) so resend/replay survives a restart
+- [x] Acceptor (server) side of the session
+- [x] FIX 4.2 and 5.0 / FIXT.1.1
+- [x] Dictionary parser + codegen (`parseDictionary`, `scripts/generate.ts`)
+- [x] Inbound required-tag validation (BeginString, SendingTime, MsgSeqNum)
+
+Next, in rough order:
+
+- [ ] Repeating-group aware parsing and typed builders
+- [ ] Multi-counterparty routing on the acceptor (dynamic CompID validation)
+- [ ] Message-level required-field validation driven by the dictionary
+- [ ] Logon authentication helpers (Username/Password, RawData)
 
 ## Contributing
 
 Contributions welcome - see [CONTRIBUTING.md](./CONTRIBUTING.md). The project has
-zero runtime dependencies and intends to keep it that way. Correctness of the
+zero runtime dependencies and intends to keep it that way, and uses
+[Biome](https://biomejs.dev) for linting and formatting. Correctness of the
 session layer is the bar: behaviour changes need a test.
 
 ## License

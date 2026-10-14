@@ -1,6 +1,6 @@
 {
   "name": "fixwire",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A modern, fully-typed FIX protocol engine for TypeScript — correct session layer, great DX.",
   "type": "module",
   "license": "MIT",
@@ -43,20 +43,19 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
     "test": "node --import tsx --test test/*.test.ts",
     "demo": "node --import tsx examples/demo.ts",
+    "generate": "node --import tsx scripts/generate.ts",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "@eslint/js": "^9",
+    "@biomejs/biome": "^2.5.15",
     "@types/node": "^22",
-    "eslint": "^9",
-    "prettier": "^3",
     "tsx": "^4",
-    "typescript": "^5",
-    "typescript-eslint": "^8"
+    "typescript": "^5"
   }
 }

@@ -1,7 +1,17 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as net from 'node:net';
-import { Session, encode, parse, FixParser, SOH, Tag, MsgType, type Field } from '../src/index.js';
+import { test } from 'node:test';
+import {
+  ApplVerID,
+  encode,
+  type Field,
+  FixParser,
+  MsgType,
+  parse,
+  Session,
+  SOH,
+  Tag,
+} from '../src/index.js';
 
 type AcceptorHandler = (
   msg: ReturnType<typeof parse>,
@@ -182,7 +192,7 @@ test('discards a message with a bad checksum without advancing sequence', async 
         [Tag.TargetCompID, 'CLIENT'],
         [Tag.SendingTime, '20240101-00:00:00.000'],
       ]);
-      sock.write(good.slice(0, -4) + 'XXX' + SOH, 'latin1'); // corrupt checksum
+      sock.write(`${good.slice(0, -4)}XXX${SOH}`, 'latin1'); // corrupt checksum
     }
   });
   const session = newSession(acc.port);
@@ -226,7 +236,7 @@ test('rejects a message that is missing MsgType', async () => {
 });
 
 test('logs out on a CompID mismatch', async () => {
-  const acc = await startAcceptor((msg, send, sock) => {
+  const acc = await startAcceptor((msg, _send, sock) => {
     if (msg.msgType === MsgType.Logon) {
       // Wrong SenderCompID - not who we dialed.
       sock.write(
@@ -301,6 +311,92 @@ test('reconnects after an unexpected disconnect', async () => {
     session.connect();
   });
   assert.ok(reconnecting, 'should emit reconnecting between the two logons');
+  session.disconnect();
+  acc.close();
+});
+
+test('rejects a message missing SendingTime', async () => {
+  const acc = await startAcceptor((msg, send, sock) => {
+    if (msg.msgType === MsgType.Logon) {
+      replyLogon(send);
+      // Heartbeat seq 2 with no tag 52.
+      sock.write(
+        encode([
+          [Tag.MsgType, MsgType.Heartbeat],
+          [Tag.MsgSeqNum, '2'],
+          [Tag.SenderCompID, 'ACCEPTOR'],
+          [Tag.TargetCompID, 'CLIENT'],
+        ]),
+        'latin1',
+      );
+    }
+  });
+  const session = newSession(acc.port);
+  const reject = await new Promise<ReturnType<typeof parse>>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('sent', (w) => {
+      const m = parse(w);
+      if (m.msgType === MsgType.Reject) resolve(m);
+    });
+    session.connect();
+  });
+  assert.equal(reject.get(Tag.RefTagID), String(Tag.SendingTime));
+  assert.equal(reject.get(Tag.SessionRejectReason), '1');
+  session.disconnect();
+  acc.close();
+});
+
+test('logs out on an incorrect BeginString', async () => {
+  const acc = await startAcceptor((msg, _send, sock) => {
+    if (msg.msgType === MsgType.Logon) {
+      // Reply with FIX.4.2 while the client expects FIX.4.4.
+      sock.write(
+        encode(
+          [
+            [Tag.MsgType, MsgType.Logon],
+            [Tag.MsgSeqNum, '1'],
+            [Tag.SenderCompID, 'ACCEPTOR'],
+            [Tag.TargetCompID, 'CLIENT'],
+            [Tag.SendingTime, '20240101-00:00:00.000'],
+            [Tag.EncryptMethod, '0'],
+            [Tag.HeartBtInt, '30'],
+          ],
+          'FIX.4.2',
+        ),
+        'latin1',
+      );
+    }
+  });
+  const session = newSession(acc.port);
+  const logout = await new Promise<ReturnType<typeof parse>>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('sent', (w) => {
+      const m = parse(w);
+      if (m.msgType === MsgType.Logout) resolve(m);
+    });
+    session.connect();
+  });
+  assert.match(logout.get(Tag.Text) ?? '', /BeginString/);
+  session.disconnect();
+  acc.close();
+});
+
+test('FIXT.1.1 logon carries BeginString and DefaultApplVerID', async () => {
+  const acc = await startAcceptor(() => {});
+  const session = newSession(acc.port, {
+    beginString: 'FIXT.1.1',
+    defaultApplVerId: ApplVerID.FIX50SP2,
+  });
+  const logon = await new Promise<ReturnType<typeof parse>>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('sent', (w) => {
+      const m = parse(w);
+      if (m.msgType === MsgType.Logon) resolve(m);
+    });
+    session.connect();
+  });
+  assert.equal(logon.get(Tag.BeginString), 'FIXT.1.1');
+  assert.equal(logon.get(Tag.DefaultApplVerID), '9');
   session.disconnect();
   acc.close();
 });

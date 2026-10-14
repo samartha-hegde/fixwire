@@ -1,4 +1,4 @@
-import { Tag, MsgType } from './constants.js';
+import { MsgType, Tag } from './constants.js';
 import type { Field } from './message.js';
 
 /** Side (tag 54) values. */
@@ -16,6 +16,19 @@ export const OrdType = {
   StopLimit: '4',
 } as const;
 export type OrdType = (typeof OrdType)[keyof typeof OrdType];
+
+/** Common DefaultApplVerID (tag 1137) values for FIXT.1.1 sessions. */
+export const ApplVerID = {
+  FIX40: '2',
+  FIX41: '3',
+  FIX42: '4',
+  FIX43: '5',
+  FIX44: '6',
+  FIX50: '7',
+  FIX50SP1: '8',
+  FIX50SP2: '9',
+} as const;
+export type ApplVerID = (typeof ApplVerID)[keyof typeof ApplVerID];
 
 /** TimeInForce (tag 59) values. */
 export const TimeInForce = {
