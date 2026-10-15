@@ -181,6 +181,12 @@ with `Side` / `OrdType` / `TimeInForce`.
 - **Multi-counterparty acceptor** - omit `targetCompId` to accept any initiator
   and learn its CompID from the Logon.
 - **Resilience** - automatic reconnect with exponential backoff.
+- **Transports** - TCP, TLS, and WebSocket (`websocketUrl`, for browser and Node);
+  or implement the `Transport` interface for your own medium.
+- **Observability** - a typed event stream to pipe into any logger, plus a
+  `session.metrics` counter (sent / received / rejects / reconnects).
+- **Message-type allowlist** - `allowedMsgTypes` rejects unexpected inbound
+  message types with a session Reject.
 - **Pluggable persistence** - in-memory by default; `FileStore` / `FileMessageStore`
   persist across restarts, or bring your own `SeqStore` / `MessageStore`.
 
@@ -202,7 +208,8 @@ npm test
 ✔ logs out on a CompID mismatch
 ✔ logs out on a sequence number that is too low
 ✔ reconnects after an unexpected disconnect
-  …33 passing
+✔ completes a logon + order round-trip over a WebSocket transport
+  …39 passing
 ```
 
 ## Interoperability
@@ -266,12 +273,15 @@ Shipped:
 - [x] Dictionary `<component>` expansion and nested repeating groups preserved as structure
 - [x] Dictionary-driven outbound message validation
 - [x] Mutual TLS (client certificates on both sides)
+- [x] Message-type allowlist and graceful unknown-message handling
+- [x] Observability: `metrics` counters and a typed event stream for logging
+- [x] WebSocket transport (`websocketUrl`) for browser and Node
 
 Next, in rough order:
 
-- [ ] Message-type allowlist and graceful unknown-message handling
-- [ ] Observability hooks (metrics / structured logging adapters)
-- [ ] Browser / WebSocket-FIX transport
+- [ ] Acceptor-side WebSocket (serve FIX over WebSocket)
+- [ ] FIXP / SBE (binary FIX) support
+- [ ] Session scheduling (StartTime / EndTime, daily sequence resets)
 
 ## Using fixwire with AI assistants
 

@@ -4,7 +4,12 @@ import { MsgType, Tag } from './constants.js';
 import type { Dictionary } from './dictionary.js';
 import { encode, type Field, type FixMessage, FixParser, isChecksumValid } from './message.js';
 import { MemoryMessageStore, MemoryStore, type MessageStore, type SeqStore } from './store.js';
-import { connect as openSocket, type TransportOptions } from './transport.js';
+import {
+  TcpTransport,
+  type Transport,
+  type TransportOptions,
+  WebSocketTransport,
+} from './transport.js';
 
 export interface ReconnectOptions {
   /** Delay before the first retry, default 1000ms. */
@@ -48,6 +53,14 @@ export interface SessionConfig {
   dictionary?: Dictionary;
   /** Validate that inbound application messages carry their required fields (needs `dictionary`). */
   validateRequired?: boolean;
+  /**
+   * Allowlist of application MsgTypes (tag 35) to accept. When set, inbound
+   * application messages whose type is not listed are rejected (SessionRejectReason
+   * 11, invalid MsgType) instead of emitted. Omit to accept all.
+   */
+  allowedMsgTypes?: string[];
+  /** Connect over WebSocket to this URL (browser or Node) instead of TCP. */
+  websocketUrl?: string;
   /**
    * Acceptor only: validate an inbound Logon (credentials, CompID) and return
    * false to reject it. Set by {@link Acceptor}; not used by initiators.
@@ -120,6 +133,8 @@ export class Session extends EventEmitter {
       | 'rawData'
       | 'dictionary'
       | 'validateRequired'
+      | 'allowedMsgTypes'
+      | 'websocketUrl'
       | 'authenticate'
     >
   > &
@@ -132,13 +147,15 @@ export class Session extends EventEmitter {
       | 'rawData'
       | 'dictionary'
       | 'validateRequired'
+      | 'allowedMsgTypes'
+      | 'websocketUrl'
       | 'authenticate'
     >;
   private readonly reconnectCfg: ReconnectOptions | null;
   private readonly store: SeqStore;
   private readonly messages: MessageStore;
   private parser = new FixParser();
-  private socket?: Socket;
+  private transport?: Transport;
   private state: State = 'disconnected';
   private role: 'initiator' | 'acceptor' = 'initiator';
 
@@ -151,6 +168,11 @@ export class Session extends EventEmitter {
   private lastRecv = 0;
   private testReqOutstanding = false;
   private testReqCounter = 0;
+
+  private sentCount = 0;
+  private recvCount = 0;
+  private rejectCount = 0;
+  private reconnectCount = 0;
 
   constructor(config: SessionConfig) {
     super();
@@ -169,6 +191,8 @@ export class Session extends EventEmitter {
       rawData: config.rawData,
       dictionary: config.dictionary,
       validateRequired: config.validateRequired,
+      allowedMsgTypes: config.allowedMsgTypes,
+      websocketUrl: config.websocketUrl,
       authenticate: config.authenticate,
     };
     this.reconnectCfg = config.reconnect
@@ -185,23 +209,36 @@ export class Session extends EventEmitter {
     return this.state;
   }
 
-  /** Open the socket and begin the logon handshake. */
+  /** Lifetime counters for observability (pipe events to a logger for detail). */
+  get metrics(): {
+    messagesSent: number;
+    messagesReceived: number;
+    rejectsReceived: number;
+    reconnects: number;
+  } {
+    return {
+      messagesSent: this.sentCount,
+      messagesReceived: this.recvCount,
+      rejectsReceived: this.rejectCount,
+      reconnects: this.reconnectCount,
+    };
+  }
+
+  /** Open the connection (TCP/TLS, or WebSocket if `websocketUrl` is set) and log on. */
   connect(): void {
     this.intentionalClose = false;
     this.state = 'connecting';
     this.parser = new FixParser();
-    const socket = openSocket({ host: this.cfg.host, port: this.cfg.port, tls: this.cfg.tls });
-    this.socket = socket;
+    const transport = this.cfg.websocketUrl
+      ? new WebSocketTransport(this.cfg.websocketUrl)
+      : TcpTransport.dial({ host: this.cfg.host, port: this.cfg.port, tls: this.cfg.tls });
+    this.bindTransport(transport);
 
-    const ready = () => {
+    transport.on('open', () => {
       if (this.state !== 'connecting') return;
       this.emit('connect');
       this.sendLogon();
-    };
-    socket.once(this.cfg.tls ? 'secureConnect' : 'connect', ready);
-    socket.on('data', (chunk: Buffer) => this.onData(chunk.toString('latin1')));
-    socket.on('error', (err) => this.emit('error', err));
-    socket.on('close', () => this.onClose());
+    });
   }
 
   /**
@@ -214,10 +251,14 @@ export class Session extends EventEmitter {
     this.intentionalClose = false;
     this.state = 'connecting';
     this.parser = new FixParser();
-    this.socket = socket;
-    socket.on('data', (chunk: Buffer) => this.onData(chunk.toString('latin1')));
-    socket.on('error', (err) => this.emit('error', err));
-    socket.on('close', () => this.onClose());
+    this.bindTransport(new TcpTransport(socket)); // socket is already open
+  }
+
+  private bindTransport(transport: Transport): void {
+    this.transport = transport;
+    transport.on('data', (chunk) => this.onData(chunk));
+    transport.on('error', (err) => this.emit('error', err));
+    transport.on('close', () => this.onClose());
   }
 
   /**
@@ -250,7 +291,7 @@ export class Session extends EventEmitter {
     this.intentionalClose = true;
     this.clearReconnect();
     this.stopTimers();
-    this.socket?.destroy();
+    this.transport?.close();
     this.state = 'disconnected';
   }
 
@@ -276,8 +317,9 @@ export class Session extends EventEmitter {
       header.push([Tag.OrigSendingTime, opts.origSendingTime ?? ts]);
     }
     const wire = encode([...header, ...body], this.cfg.beginString);
-    this.socket?.write(wire, 'latin1');
+    this.transport?.write(wire);
     this.lastSent = Date.now();
+    this.sentCount++;
     // Retain fresh (non-replay) sends so we can answer a ResendRequest later.
     if (!explicit) this.messages.put({ seq, msgType, body, sendingTime: ts });
     this.emit('sent', wire);
@@ -344,6 +386,8 @@ export class Session extends EventEmitter {
 
   /** SessionRejectReason: required tag missing. */
   private static readonly REQUIRED_TAG_MISSING = 1;
+  /** SessionRejectReason: invalid/unsupported MsgType. */
+  private static readonly INVALID_MSGTYPE = 11;
 
   private sendLogout(text?: string): void {
     this.state = 'logout-sent';
@@ -372,6 +416,7 @@ export class Session extends EventEmitter {
       return;
     }
 
+    this.recvCount++;
     this.emit('message', msg);
     const type = msg.msgType;
     const seq = msg.seqNum;
@@ -467,9 +512,17 @@ export class Session extends EventEmitter {
         this.onLogout(msg);
         break;
       case MsgType.Reject:
+        this.rejectCount++;
         this.emit('reject', msg);
         break;
       default:
+        if (this.cfg.allowedMsgTypes && !this.cfg.allowedMsgTypes.includes(type)) {
+          this.sendReject(seq, `unsupported MsgType ${type}`, {
+            reason: Session.INVALID_MSGTYPE,
+            refTagId: Tag.MsgType,
+          });
+          return;
+        }
         if (this.checkRequired(msg, type)) this.emit('app', msg);
         break;
     }
@@ -634,10 +687,10 @@ export class Session extends EventEmitter {
         this.testReqOutstanding = true;
         this.sendTestRequest();
       } else if (now - this.lastRecv >= hb * 3) {
-        // Drop the socket without marking the close intentional so reconnect fires.
+        // Drop the connection without marking the close intentional so reconnect fires.
         this.emit('error', new Error('heartbeat timeout - no response to TestRequest'));
         this.stopTimers();
-        this.socket?.destroy();
+        this.transport?.close();
       }
     }
   }
@@ -660,6 +713,7 @@ export class Session extends EventEmitter {
       return;
     }
     const attempt = ++this.reconnectAttempts;
+    this.reconnectCount++;
     const delay = Math.min(maxDelayMs, initialDelayMs * 2 ** (attempt - 1));
     this.emit('reconnecting', attempt, delay);
     this.clearReconnect();

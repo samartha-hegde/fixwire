@@ -476,3 +476,54 @@ test('throws on an outbound message missing a required field', async () => {
   session.disconnect();
   acc.close();
 });
+
+test('rejects an application message not in the allowlist', async () => {
+  const acc = await startAcceptor((msg, send) => {
+    if (msg.msgType === MsgType.Logon) {
+      replyLogon(send);
+      send('AE', [[Tag.ClOrdID, 'x']]); // AE = TradeCaptureReport, not allowed
+    }
+  });
+  const session = newSession(acc.port, { allowedMsgTypes: [MsgType.ExecutionReport] });
+  let appSeen = false;
+  session.on('app', () => {
+    appSeen = true;
+  });
+  const reject = await new Promise<ReturnType<typeof parse>>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('sent', (w) => {
+      const m = parse(w);
+      if (m.msgType === MsgType.Reject) resolve(m);
+    });
+    session.connect();
+  });
+  assert.equal(reject.get(Tag.SessionRejectReason), '11'); // invalid MsgType
+  assert.equal(appSeen, false);
+  session.disconnect();
+  acc.close();
+});
+
+test('tracks lifetime metrics counters', async () => {
+  const acc = await startAcceptor((msg, send) => {
+    if (msg.msgType === MsgType.Logon) replyLogon(send);
+    else if (msg.msgType === MsgType.NewOrderSingle) {
+      send(MsgType.ExecutionReport, [
+        [Tag.ClOrdID, msg.get(Tag.ClOrdID) ?? ''],
+        [Tag.OrdStatus, '0'],
+      ]);
+    }
+  });
+  const session = newSession(acc.port);
+  await new Promise<void>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('logon', () => session.send(MsgType.NewOrderSingle, [[Tag.ClOrdID, 'o-1']]));
+    session.on('app', (m) => {
+      if (m.msgType === MsgType.ExecutionReport) resolve();
+    });
+    session.connect();
+  });
+  assert.ok(session.metrics.messagesSent >= 2, 'logon + order sent');
+  assert.ok(session.metrics.messagesReceived >= 2, 'logon + execution report received');
+  session.disconnect();
+  acc.close();
+});

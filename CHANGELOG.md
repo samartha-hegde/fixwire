@@ -6,7 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-10-14
+## [0.5.0] - 2026-10-15
+
+### Added
+
+- **WebSocket transport**: set `websocketUrl` to run a session over WebSocket
+  (browser or Node 22+) instead of TCP. Transport is now an abstraction
+  (`Transport`, `TcpTransport`, `WebSocketTransport`); implement your own medium.
+- **Message-type allowlist**: `allowedMsgTypes` rejects inbound application
+  messages outside the list with a session Reject (SessionRejectReason 11).
+- **Observability**: `session.metrics` exposes lifetime counters (messages sent /
+  received, rejects received, reconnects); the typed event stream is the logging
+  seam.
+
+### Changed
+
+- Internally, the session now reads and writes through a `Transport` rather than a
+  raw socket. No change for TCP/TLS users.
 
 ### Added
 
@@ -91,7 +107,8 @@ Initial public release. FIX 4.4, initiator (client) side.
 - `newOrderSingle` builder with `Side` / `OrdType` / `TimeInForce` constants.
 - TCP and TLS transport.
 
-[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/samartha-hegde/fixwire/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/samartha-hegde/fixwire/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/samartha-hegde/fixwire/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/samartha-hegde/fixwire/compare/v0.1.0...v0.2.0

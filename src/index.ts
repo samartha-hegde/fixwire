@@ -11,5 +11,5 @@ export type { ReconnectOptions, SessionConfig, SessionEvents } from './session.j
 export { Session } from './session.js';
 export type { MessageStore, SeqStore, StoredMessage } from './store.js';
 export { FileMessageStore, FileStore, MemoryMessageStore, MemoryStore } from './store.js';
-export type { TransportOptions } from './transport.js';
-export { connect } from './transport.js';
+export type { TransportEvents, TransportOptions } from './transport.js';
+export { connect, TcpTransport, Transport, WebSocketTransport } from './transport.js';
