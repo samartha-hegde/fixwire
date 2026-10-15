@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>fixwire vs FIXParser · a free, MIT-licensed FIX library for TypeScript</title>
+<meta name="description" content="Looking for a FIXParser alternative? fixwire is a free, MIT-licensed, zero-dependency FIX protocol library for TypeScript with a full session layer (initiator and acceptor), where FIXParser charges for encoding and sessions." />
+<meta name="keywords" content="FIXParser alternative, fixwire vs fixparser, free FIX library TypeScript, open source FIX engine, FIX session TypeScript, MIT FIX protocol library" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#100e0a" />
+<link rel="canonical" href="https://samartha-hegde.github.io/fixwire/vs-fixparser.html" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="fixwire vs FIXParser" />
+<meta property="og:description" content="A free, MIT-licensed, zero-dependency FIX library for TypeScript with initiator and acceptor, versus FIXParser's commercial tiers." />
+<meta property="og:url" content="https://samartha-hegde.github.io/fixwire/vs-fixparser.html" />
+<style>
+  :root {
+    --ground: #100e0a;
+    --ground-2: #15120c;
+    --panel: #1b1710;
+    --ink: #f3eee2;
+    --muted: #a99e88;
+    --faint: #6f6650;
+    --line: rgba(243, 238, 226, 0.09);
+    --line-strong: rgba(243, 238, 226, 0.16);
+    --amber: #f5a623;
+    --amber-bright: #ffbe4d;
+    --pass: #5bd38a;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1000px 560px at 80% -10%, rgba(245, 166, 35, 0.09), transparent 60%),
+      var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--amber); text-decoration: none; }
+  a:hover { color: var(--amber-bright); }
+  .wrap { width: 100%; max-width: 920px; margin: 0 auto; padding: 0 24px; }
+  .nav { border-bottom: 1px solid var(--line); }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 62px; }
+  .brand { font-family: var(--mono); font-weight: 700; color: var(--ink); }
+  .brand b { color: var(--amber); }
+  .nav a.home { font-size: 0.9rem; color: var(--muted); }
+  header.hero { padding: 72px 0 36px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--amber); margin: 0 0 16px;
+  }
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 820; letter-spacing: -0.03em;
+    line-height: 1.05; margin: 0; text-wrap: balance;
+  }
+  h1 .accent { color: var(--amber); }
+  .lede { color: var(--muted); font-size: 1.1rem; margin: 20px 0 0; max-width: 62ch; }
+  .lede b { color: var(--ink); font-weight: 600; }
+  section { padding: 28px 0; }
+  h2 { font-size: 1.5rem; font-weight: 720; letter-spacing: -0.02em; margin: 0 0 18px; }
+  p { color: var(--muted); }
+  p b { color: var(--ink); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line-strong); border-radius: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.96rem; min-width: 560px; }
+  th, td { text-align: left; padding: 13px 18px; border-top: 1px solid var(--line); }
+  thead th { border-top: none; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.04em; }
+  thead th.fw { color: var(--amber); }
+  thead th.fp { color: var(--muted); }
+  tbody th { font-weight: 600; color: var(--ink); width: 34%; }
+  td.fw { color: var(--ink); background: rgba(245, 166, 35, 0.05); }
+  td.fp { color: var(--muted); }
+  .yes { color: var(--pass); font-weight: 700; }
+  .no { color: var(--faint); }
+  .paid { color: var(--amber); font-family: var(--mono); font-size: 0.85rem; }
+  .install {
+    display: inline-flex; align-items: center; gap: 0; margin-top: 10px;
+    border: 1px solid var(--line-strong); border-radius: 11px; background: var(--panel); overflow: hidden;
+  }
+  .install code { font-family: var(--mono); font-size: 0.92rem; padding: 12px 18px; }
+  .install code .pr { color: var(--amber); }
+  .cta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
+  .btn {
+    font-weight: 600; padding: 12px 20px; border-radius: 10px; font-size: 0.95rem;
+    border: 1px solid var(--line-strong); color: var(--ink);
+  }
+  .btn-primary { background: var(--amber); color: #1a1304; border-color: var(--amber); }
+  .fair {
+    border: 1px solid var(--line); border-left: 3px solid var(--amber);
+    border-radius: 10px; padding: 18px 22px; background: var(--ground-2); margin-top: 8px;
+  }
+  .fair p { margin: 0; color: var(--muted); }
+  footer { border-top: 1px solid var(--line); margin-top: 32px; padding: 30px 0 60px; }
+  footer p { color: var(--faint); font-size: 0.82rem; }
+</style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="wrap">
+      <a class="brand" href="./">fix<b>wire</b></a>
+      <a class="home" href="./">← back to fixwire</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">fixwire vs FIXParser</p>
+      <h1>A free, MIT-licensed <span class="accent">FIXParser alternative</span> for TypeScript.</h1>
+      <p class="lede">
+        FIXParser is a capable commercial FIX library, but its free tier parses only:
+        <b>encoding, session management, and the FIX server are paid</b> ($5K to $10K+/year).
+        fixwire does all of it under <b>MIT, for free, with zero dependencies</b>, including
+        both initiator and acceptor sessions.
+      </p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/samartha-hegde/fixwire">View fixwire on GitHub</a>
+        <span class="install"><code><span class="pr">$</span> npm install fixwire</code></span>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="wrap">
+      <h2>Side by side</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th></th><th class="fw">fixwire</th><th class="fp">FIXParser</th></tr>
+          </thead>
+          <tbody>
+            <tr><th>License</th><td class="fw">MIT (free, incl. commercial use)</td><td class="fp">Commercial / tiered</td></tr>
+            <tr><th>Price</th><td class="fw"><span class="yes">Free</span></td><td class="fp"><span class="paid">Free (parse-only) · Pro $5K+ · Enterprise $10K+ /yr</span></td></tr>
+            <tr><th>Open source</th><td class="fw"><span class="yes">Yes</span></td><td class="fp"><span class="no">No</span></td></tr>
+            <tr><th>Registration to use</th><td class="fw"><span class="yes">None</span></td><td class="fp">Free tier requires a license key</td></tr>
+            <tr><th>Parse FIX messages</th><td class="fw"><span class="yes">✓</span></td><td class="fp"><span class="yes">✓</span> (free)</td></tr>
+            <tr><th>Encode FIX messages</th><td class="fw"><span class="yes">✓</span></td><td class="fp"><span class="paid">Pro (paid)</span></td></tr>
+            <tr><th>Session management (initiator)</th><td class="fw"><span class="yes">✓</span></td><td class="fp"><span class="paid">Pro (paid)</span></td></tr>
+            <tr><th>Acceptor / FIX server</th><td class="fw"><span class="yes">✓</span></td><td class="fp"><span class="paid">Pro (paid)</span></td></tr>
+            <tr><th>Transports</th><td class="fw">TCP, TLS, WebSocket</td><td class="fp">TCP, TLS, WebSocket</td></tr>
+            <tr><th>FIX versions</th><td class="fw">4.2 / 4.4 / 5.0 (FIXT.1.1)</td><td class="fp">FIX 4.x / 5.x</td></tr>
+            <tr><th>Runtime dependencies</th><td class="fw"><span class="yes">Zero</span></td><td class="fp">—</td></tr>
+            <tr><th>Interop-tested vs QuickFIX / quickfixgo / QuickFIX/J</th><td class="fw"><span class="yes">✓ (public)</span></td><td class="fp">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>When FIXParser is the better pick</h2>
+      <div class="fair">
+        <p>
+          Fair is fair: FIXParser is a polished, performance-focused product (it advertises
+          single-digit-microsecond parsing), and its Enterprise tier bundles managed extras
+          fixwire does not try to be, an analytics dashboard, anomaly detection, a hosted MCP
+          server, and commercial support. If you want a vendor-supported product with those
+          features and a support contract, FIXParser is worth evaluating. If you want a free,
+          MIT-licensed engine you can read, own, and ship without a license fee, choose fixwire.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Switching is a few lines</h2>
+      <p>
+        fixwire connects, trades, and logs out in about a dozen lines, and it is verified
+        against the real QuickFIX, quickfixgo, and QuickFIX/J engines across FIX 4.2, 4.4, and
+        5.0. See the <a href="./">overview</a>, the
+        <a href="https://github.com/samartha-hegde/fixwire#readme">README</a>, and the
+        <a href="https://github.com/samartha-hegde/fixwire/tree/main/examples">examples</a>.
+      </p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://www.npmjs.com/package/fixwire">fixwire on npm</a>
+        <a class="btn" href="./">fixwire overview</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <p>
+        FIXParser details reflect what <a href="https://fixparser.dev/">fixparser.dev</a>
+        advertised in October 2026; pricing and features may change, verify current terms on
+        their site. "FIXParser" is a trademark of its respective owner. This page is an
+        independent comparison, not affiliated with or endorsed by FIXParser.
+      </p>
+    </div>
+  </footer>
+</body>
+</html>
