@@ -8,23 +8,35 @@ export class FixMessage {
   readonly fields: Field[];
   /** The raw wire string this was parsed from, when available. */
   readonly raw?: string;
-  private readonly index: Map<number, string>;
+  // The index is built lazily: small messages read a few times just scan the
+  // field array (no allocation); large or heavily-read messages memoize a Map.
+  private index?: Map<number, string>;
+  private reads = 0;
 
   constructor(fields: Field[] = [], raw?: string) {
     this.fields = fields;
     this.raw = raw;
-    this.index = new Map();
-    for (const [tag, val] of fields) {
-      if (!this.index.has(tag)) this.index.set(tag, val);
-    }
   }
 
   get(tag: number): string | undefined {
-    return this.index.get(tag);
+    if (this.index) return this.index.get(tag);
+    const fields = this.fields;
+    if (fields.length > 32 || ++this.reads > 8) {
+      const index = new Map<number, string>();
+      for (const [t, v] of fields) {
+        if (!index.has(t)) index.set(t, v);
+      }
+      this.index = index;
+      return index.get(tag);
+    }
+    for (const [t, v] of fields) {
+      if (t === tag) return v;
+    }
+    return undefined;
   }
 
   getInt(tag: number): number | undefined {
-    const v = this.index.get(tag);
+    const v = this.get(tag);
     if (v === undefined) return undefined;
     const n = Number(v);
     return Number.isFinite(n) ? n : undefined;

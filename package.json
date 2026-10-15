@@ -1,6 +1,6 @@
 {
   "name": "fixwire",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A modern, fully-typed FIX protocol library for TypeScript. A QuickFIX-style engine with a correct session layer, zero dependencies, initiator and acceptor, FIX 4.2 to 5.0.",
   "type": "module",
   "license": "MIT",
@@ -58,6 +58,7 @@
     "test": "node --import tsx --test test/*.test.ts",
     "demo": "node --import tsx examples/demo.ts",
     "generate": "node --import tsx scripts/generate.ts",
+    "bench": "node --import tsx scripts/bench.ts",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {

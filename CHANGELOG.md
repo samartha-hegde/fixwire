@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-15
+
+### Changed
+
+- Performance: `FixMessage` now builds its tag index lazily (scanning the field
+  array for small messages, memoizing a `Map` only when a message is large or read
+  repeatedly). A typical parse is ~30% faster (about 1.3 µs/msg). Added `npm run bench`.
+
 ## [0.5.0] - 2026-10-15
 
 ### Added
@@ -107,7 +115,8 @@ Initial public release. FIX 4.4, initiator (client) side.
 - `newOrderSingle` builder with `Side` / `OrdType` / `TimeInForce` constants.
 - TCP and TLS transport.
 
-[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/samartha-hegde/fixwire/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/samartha-hegde/fixwire/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/samartha-hegde/fixwire/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/samartha-hegde/fixwire/compare/v0.2.0...v0.3.0

@@ -212,6 +212,18 @@ npm test
   …39 passing
 ```
 
+## Performance
+
+fixwire parses a typical message in roughly **1.3 microseconds** and encodes in
+about **1.1 microseconds** (a 19-field ExecutionReport, measured with
+`npm run bench`; your numbers vary by machine and message). The parser avoids a
+per-message allocation in the common path, so it stays in the
+single-digit-microsecond range. Run the benchmark yourself:
+
+```bash
+npm run bench
+```
+
 ## Interoperability
 
 Beyond its own test suite, fixwire is interop-tested against independent,
