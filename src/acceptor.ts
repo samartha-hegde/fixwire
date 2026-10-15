@@ -3,8 +3,9 @@ import * as net from 'node:net';
 import * as tls from 'node:tls';
 import type { Dictionary } from './dictionary.js';
 import type { FixMessage } from './message.js';
-import { Session } from './session.js';
+import { Session, type SessionConfig } from './session.js';
 import { MemoryMessageStore, MemoryStore, type MessageStore, type SeqStore } from './store.js';
+import { type WebSocketLike, WebSocketTransport } from './transport.js';
 
 export interface AcceptorConfig {
   /** Our CompID (the acceptor). */
@@ -118,4 +119,28 @@ export class Acceptor extends EventEmitter {
     this.emit('session', session);
     session.attach(socket);
   }
+}
+
+/** Config for {@link acceptWebSocket} (a session config without the TCP/dial fields). */
+export type AcceptWebSocketConfig = Omit<
+  SessionConfig,
+  'host' | 'port' | 'websocketUrl' | 'tls' | 'reconnect'
+>;
+
+/**
+ * Run a fixwire acceptor session over an already-connected server-side WebSocket.
+ * Bring your own WebSocket server (`ws`, Bun, Deno, Cloudflare, ...) and hand each
+ * connection here; fixwire stays dependency-free. Returns the {@link Session} so
+ * you can attach handlers. Set `targetCompId: ''` to accept any counterparty.
+ *
+ * @example
+ * wss.on('connection', (ws) => {
+ *   const session = acceptWebSocket(ws, { senderCompId: 'SERVER', targetCompId: 'CLIENT' });
+ *   session.on('app', (msg) => { ... });
+ * });
+ */
+export function acceptWebSocket(ws: WebSocketLike, config: AcceptWebSocketConfig): Session {
+  const session = new Session({ ...config, host: '', port: 0 });
+  session.attachTransport(new WebSocketTransport(ws));
+  return session;
 }

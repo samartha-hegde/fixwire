@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { type AddressInfo, WebSocketServer } from 'ws';
 import {
+  acceptWebSocket,
   encode,
   type Field,
   type FixMessage,
@@ -72,4 +73,50 @@ test('completes a logon + order round-trip over a WebSocket transport', async ()
   assert.equal(exec.get(Tag.ClOrdID), 'order-1');
   session.disconnect();
   acc.close();
+});
+
+test('fixwire acceptor over WebSocket round-trips with a fixwire initiator', async () => {
+  const wss = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  let serverLoggedOn = false;
+  wss.on('connection', (ws) => {
+    const session = acceptWebSocket(ws, { senderCompId: 'SERVER', targetCompId: 'CLIENT' });
+    session.on('logon', () => {
+      serverLoggedOn = true;
+    });
+    session.on('app', (m) => {
+      if (m.msgType === MsgType.NewOrderSingle) {
+        session.send(MsgType.ExecutionReport, [
+          [Tag.ClOrdID, m.get(Tag.ClOrdID) ?? ''],
+          [Tag.OrdStatus, '0'],
+        ]);
+      }
+    });
+  });
+  const url = await new Promise<string>((resolve) => {
+    wss.on('listening', () => {
+      const { port } = wss.address() as AddressInfo;
+      resolve(`ws://127.0.0.1:${port}`);
+    });
+  });
+
+  const client = new Session({
+    senderCompId: 'CLIENT',
+    targetCompId: 'SERVER',
+    host: '',
+    port: 0,
+    websocketUrl: url,
+    resetOnLogon: true,
+  });
+  const exec = await new Promise<FixMessage>((resolve, reject) => {
+    client.on('error', reject);
+    client.on('logon', () => client.send(MsgType.NewOrderSingle, [[Tag.ClOrdID, 'ws-1']]));
+    client.on('app', (m) => {
+      if (m.msgType === MsgType.ExecutionReport) resolve(m);
+    });
+    client.connect();
+  });
+  assert.ok(serverLoggedOn, 'acceptor logged on over WebSocket');
+  assert.equal(exec.get(Tag.ClOrdID), 'ws-1');
+  client.disconnect();
+  wss.close();
 });

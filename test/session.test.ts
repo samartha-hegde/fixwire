@@ -527,3 +527,49 @@ test('tracks lifetime metrics counters', async () => {
   session.disconnect();
   acc.close();
 });
+
+const hms = (d: Date): string => {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+};
+
+test('scheduled session connects inside the window', async () => {
+  const acc = await startAcceptor((msg, send) => {
+    if (msg.msgType === MsgType.Logon) replyLogon(send);
+  });
+  const now = new Date();
+  const schedule = {
+    startTime: hms(new Date(now.getTime() - 5 * 60_000)), // 5 min ago
+    endTime: hms(new Date(now.getTime() + 60 * 60_000)), // 1 h ahead
+  };
+  const session = newSession(acc.port, { schedule });
+  await new Promise<void>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('logon', () => resolve());
+    session.connect();
+  });
+  session.disconnect();
+  acc.close();
+});
+
+test('scheduled session stays idle outside the window', async () => {
+  const acc = await startAcceptor((msg, send) => {
+    if (msg.msgType === MsgType.Logon) replyLogon(send);
+  });
+  const now = new Date();
+  const schedule = {
+    startTime: hms(new Date(now.getTime() + 2 * 60 * 60_000)), // 2 h ahead
+    endTime: hms(new Date(now.getTime() + 3 * 60 * 60_000)), // 3 h ahead
+  };
+  const session = newSession(acc.port, { schedule });
+  let loggedOn = false;
+  session.on('logon', () => {
+    loggedOn = true;
+  });
+  session.connect();
+  await new Promise((r) => setTimeout(r, 150));
+  assert.equal(loggedOn, false, 'must not connect outside the window');
+  assert.equal(session.status, 'disconnected');
+  session.disconnect();
+  acc.close();
+});

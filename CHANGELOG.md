@@ -6,6 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-15
+
+### Added
+
+- **Acceptor-side WebSocket**: `acceptWebSocket(ws, config)` runs a fixwire
+  acceptor session over an already-connected server-side WebSocket. Bring your own
+  WS server (`ws`, Bun, Deno, Cloudflare); fixwire stays dependency-free. The
+  `WebSocketTransport` now also wraps an existing connection, and
+  `Session.attachTransport` runs an acceptor over any `Transport`.
+- **Session scheduling**: a `schedule` (daily UTC `startTime` / `endTime`) makes an
+  initiator connect only inside the window, log out at its end, and reconnect with
+  a reset sequence at the next start. Exposes pure helpers `isWithinSchedule` and
+  `msUntilTime`.
+
+### Notes
+
+- FIXP / SBE (binary FIX) is intentionally out of scope; it is a separate major
+  effort, not a bolt-on. Classic tag=value FIX remains fixwire's focus.
+
 ## [0.5.2] - 2026-10-15
 
 ### Security
@@ -125,7 +144,8 @@ Initial public release. FIX 4.4, initiator (client) side.
 - `newOrderSingle` builder with `Side` / `OrdType` / `TimeInForce` constants.
 - TCP and TLS transport.
 
-[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/samartha-hegde/fixwire/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/samartha-hegde/fixwire/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/samartha-hegde/fixwire/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/samartha-hegde/fixwire/compare/v0.4.0...v0.5.0

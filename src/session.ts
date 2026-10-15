@@ -10,6 +10,7 @@ import {
   FixParser,
   isChecksumValid,
 } from './message.js';
+import { isWithinSchedule, msUntilTime, type Schedule } from './schedule.js';
 import { MemoryMessageStore, MemoryStore, type MessageStore, type SeqStore } from './store.js';
 import {
   TcpTransport,
@@ -70,6 +71,12 @@ export interface SessionConfig {
   websocketUrl?: string;
   /** Max bytes buffered for a single inbound message before the stream is rejected. Default 64 KiB. */
   maxMessageSize?: number;
+  /**
+   * Daily session window (UTC). The initiator connects only inside the window,
+   * logs out at its end, and reconnects (resetting sequence numbers) at the next
+   * start. Omit for an always-on session.
+   */
+  schedule?: Schedule;
   /**
    * Acceptor only: validate an inbound Logon (credentials, CompID) and return
    * false to reject it. Set by {@link Acceptor}; not used by initiators.
@@ -144,6 +151,7 @@ export class Session extends EventEmitter {
       | 'validateRequired'
       | 'allowedMsgTypes'
       | 'websocketUrl'
+      | 'schedule'
       | 'authenticate'
     >
   > &
@@ -158,6 +166,7 @@ export class Session extends EventEmitter {
       | 'validateRequired'
       | 'allowedMsgTypes'
       | 'websocketUrl'
+      | 'schedule'
       | 'authenticate'
     >;
   private readonly reconnectCfg: ReconnectOptions | null;
@@ -170,6 +179,7 @@ export class Session extends EventEmitter {
 
   private timer?: ReturnType<typeof setInterval>;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
+  private scheduleTimer?: ReturnType<typeof setTimeout>;
   private reconnectAttempts = 0;
   private intentionalClose = false;
 
@@ -203,6 +213,7 @@ export class Session extends EventEmitter {
       validateRequired: config.validateRequired,
       allowedMsgTypes: config.allowedMsgTypes,
       websocketUrl: config.websocketUrl,
+      schedule: config.schedule,
       authenticate: config.authenticate,
     };
     this.reconnectCfg = config.reconnect
@@ -234,8 +245,20 @@ export class Session extends EventEmitter {
     };
   }
 
-  /** Open the connection (TCP/TLS, or WebSocket if `websocketUrl` is set) and log on. */
+  /**
+   * Open the connection (TCP/TLS, or WebSocket if `websocketUrl` is set) and log on.
+   * With a `schedule`, connects only inside the daily window, logs out at its end,
+   * and reconnects (resetting sequence numbers) at the next start.
+   */
   connect(): void {
+    if (this.cfg.schedule) {
+      this.runSchedule();
+      return;
+    }
+    this.openConnection();
+  }
+
+  private openConnection(): void {
     this.intentionalClose = false;
     this.state = 'connecting';
     this.parser = new FixParser(this.cfg.maxMessageSize);
@@ -251,17 +274,67 @@ export class Session extends EventEmitter {
     });
   }
 
+  /** Scheduled sessions: connect within the window, otherwise wait for the next start. */
+  private runSchedule(): void {
+    const schedule = this.cfg.schedule;
+    if (!schedule) return;
+    this.clearScheduleTimer();
+    const now = new Date();
+    if (isWithinSchedule(now, schedule.startTime, schedule.endTime)) {
+      // New daily session: reset sequence numbers at the start of the window.
+      this.store.reset();
+      this.messages.reset();
+      this.openConnection();
+      this.scheduleTimer = setTimeout(
+        () => this.onScheduleEnd(),
+        msUntilTime(now, schedule.endTime),
+      );
+    } else {
+      this.scheduleTimer = setTimeout(
+        () => this.runSchedule(),
+        msUntilTime(now, schedule.startTime),
+      );
+    }
+    this.scheduleTimer?.unref?.();
+  }
+
+  private onScheduleEnd(): void {
+    // End of the daily window: log out cleanly and do not auto-reconnect; the
+    // next window start reconnects with a fresh sequence.
+    this.intentionalClose = true;
+    if (this.state === 'active' || this.state === 'logon-sent') this.sendLogout();
+    this.stopTimers();
+    this.transport?.close();
+    this.state = 'disconnected';
+    this.runSchedule();
+  }
+
+  private clearScheduleTimer(): void {
+    if (this.scheduleTimer) {
+      clearTimeout(this.scheduleTimer);
+      this.scheduleTimer = undefined;
+    }
+  }
+
   /**
    * Run this session as an acceptor over an already-connected socket, waiting
    * for the counterparty's Logon rather than initiating. Used by {@link Acceptor}.
    * @internal
    */
   attach(socket: Socket): void {
+    this.attachTransport(new TcpTransport(socket)); // socket is already open
+  }
+
+  /**
+   * Run this session as an acceptor over an already-connected {@link Transport}
+   * (TCP, WebSocket, or your own). Used by {@link Acceptor} and `acceptWebSocket`.
+   */
+  attachTransport(transport: Transport): void {
     this.role = 'acceptor';
     this.intentionalClose = false;
     this.state = 'connecting';
     this.parser = new FixParser(this.cfg.maxMessageSize);
-    this.bindTransport(new TcpTransport(socket)); // socket is already open
+    this.bindTransport(transport);
   }
 
   private bindTransport(transport: Transport): void {
@@ -296,10 +369,11 @@ export class Session extends EventEmitter {
     this.sendLogout(text);
   }
 
-  /** Tear the socket down immediately. Suppresses auto-reconnect. */
+  /** Tear the socket down immediately. Suppresses auto-reconnect and scheduling. */
   disconnect(): void {
     this.intentionalClose = true;
     this.clearReconnect();
+    this.clearScheduleTimer();
     this.stopTimers();
     this.transport?.close();
     this.state = 'disconnected';
@@ -728,7 +802,9 @@ export class Session extends EventEmitter {
     this.emit('reconnecting', attempt, delay);
     this.clearReconnect();
     this.reconnectTimer = setTimeout(() => {
-      if (!this.intentionalClose) this.connect();
+      // openConnection (not connect) so a mid-window reconnect does not re-run the
+      // schedule and reset sequence numbers; resend/recovery is preserved.
+      if (!this.intentionalClose) this.openConnection();
     }, delay);
     this.reconnectTimer.unref?.();
   }

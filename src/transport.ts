@@ -80,7 +80,11 @@ export class TcpTransport extends Transport {
 interface WsEvent {
   data?: unknown;
 }
-interface MinimalWebSocket {
+/**
+ * The minimal WebSocket surface fixwire needs. Satisfied by the browser/Node
+ * global `WebSocket` and by server-side connections from `ws`, Bun, Deno, etc.
+ */
+export interface WebSocketLike {
   send(data: string): void;
   close(): void;
   addEventListener(
@@ -88,7 +92,7 @@ interface MinimalWebSocket {
     listener: (ev: WsEvent) => void,
   ): void;
 }
-type WebSocketCtor = new (url: string) => MinimalWebSocket;
+type WebSocketCtor = new (url: string) => WebSocketLike;
 
 function toLatin1(data: unknown): string {
   if (typeof data === 'string') return data;
@@ -110,15 +114,24 @@ function toLatin1(data: unknown): string {
  * normally uses text frames. Use binary (ArrayBuffer) or text and this is fine.
  */
 export class WebSocketTransport extends Transport {
-  private readonly ws: MinimalWebSocket;
+  private readonly ws: WebSocketLike;
 
-  constructor(url: string) {
+  /**
+   * Pass a `ws://`/`wss://` URL to dial (initiator), or an already-connected
+   * {@link WebSocketLike} to wrap a server-side connection (acceptor).
+   */
+  constructor(target: string | WebSocketLike) {
     super();
-    const Ctor = (globalThis as { WebSocket?: WebSocketCtor }).WebSocket;
-    if (!Ctor) {
-      throw new Error('global WebSocket is not available (needs a browser or Node.js 22+)');
+    let ws: WebSocketLike;
+    if (typeof target === 'string') {
+      const Ctor = (globalThis as { WebSocket?: WebSocketCtor }).WebSocket;
+      if (!Ctor) {
+        throw new Error('global WebSocket is not available (needs a browser or Node.js 22+)');
+      }
+      ws = new Ctor(target);
+    } else {
+      ws = target; // wrap an existing (already-open) connection
     }
-    const ws = new Ctor(url);
     this.ws = ws;
     ws.addEventListener('open', () => this.emit('open'));
     ws.addEventListener('message', (ev) => this.emit('data', toLatin1(ev.data)));

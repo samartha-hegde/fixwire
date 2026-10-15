@@ -181,8 +181,11 @@ with `Side` / `OrdType` / `TimeInForce`.
 - **Multi-counterparty acceptor** - omit `targetCompId` to accept any initiator
   and learn its CompID from the Logon.
 - **Resilience** - automatic reconnect with exponential backoff.
-- **Transports** - TCP, TLS, and WebSocket (`websocketUrl`, for browser and Node);
-  or implement the `Transport` interface for your own medium.
+- **Transports** - TCP, TLS, and WebSocket (`websocketUrl`, for browser and Node),
+  on both sides: dial with a `Session` or serve with `acceptWebSocket` over your
+  own WS server. Or implement the `Transport` interface for your own medium.
+- **Scheduling** - a daily session window (`schedule`): connect inside it, log out
+  at its end, and reconnect with a fresh sequence at the next start.
 - **Observability** - a typed event stream to pipe into any logger, plus a
   `session.metrics` counter (sent / received / rejects / reconnects).
 - **Message-type allowlist** - `allowedMsgTypes` rejects unexpected inbound
@@ -209,7 +212,9 @@ npm test
 ✔ logs out on a sequence number that is too low
 ✔ reconnects after an unexpected disconnect
 ✔ completes a logon + order round-trip over a WebSocket transport
-  …39 passing
+✔ fixwire acceptor over WebSocket round-trips with a fixwire initiator
+✔ scheduled session connects inside the window and stays idle outside it
+  …49 passing
 ```
 
 ## Performance
@@ -292,12 +297,18 @@ Shipped:
 - [x] Message-type allowlist and graceful unknown-message handling
 - [x] Observability: `metrics` counters and a typed event stream for logging
 - [x] WebSocket transport (`websocketUrl`) for browser and Node
+- [x] Acceptor-side WebSocket (`acceptWebSocket`, bring your own WS server)
+- [x] Session scheduling (daily window + sequence reset via `schedule`)
 
 Next, in rough order:
 
-- [ ] Acceptor-side WebSocket (serve FIX over WebSocket)
-- [ ] FIXP / SBE (binary FIX) support
-- [ ] Session scheduling (StartTime / EndTime, daily sequence resets)
+- [ ] Richer schedules (weekly windows, per-day exceptions, holidays)
+- [ ] Pluggable observability adapters (ready-made pino / OpenTelemetry bridges)
+
+**FIXP / SBE (binary FIX)** is intentionally out of scope for now: it is a
+different session protocol and a schema-driven binary codec, effectively a second
+engine, and belongs in its own major effort rather than a bolt-on. Classic
+tag=value FIX (4.2 / 4.4 / 5.0) is fixwire's focus.
 
 ## Using fixwire with AI assistants
 
