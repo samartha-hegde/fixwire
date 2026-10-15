@@ -247,6 +247,10 @@ Transport security is TLS, configured through standard Node TLS options. (FIX's
 own message-level encryption via `EncryptMethod` is obsolete and intentionally
 unsupported; `EncryptMethod` is always `0`. Use TLS.)
 
+The streaming parser is bounded: a single message is capped at `maxMessageSize`
+(default 64 KiB) so a hostile or malformed peer cannot grow memory without limit.
+Tune it on `Session` / `Acceptor` or `new FixParser(maxBytes)`.
+
 Mutual TLS works on both sides. Initiator presenting a client certificate:
 
 ```ts

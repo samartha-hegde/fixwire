@@ -2,7 +2,14 @@ import { EventEmitter } from 'node:events';
 import type { Socket } from 'node:net';
 import { MsgType, Tag } from './constants.js';
 import type { Dictionary } from './dictionary.js';
-import { encode, type Field, type FixMessage, FixParser, isChecksumValid } from './message.js';
+import {
+  DEFAULT_MAX_MESSAGE_SIZE,
+  encode,
+  type Field,
+  type FixMessage,
+  FixParser,
+  isChecksumValid,
+} from './message.js';
 import { MemoryMessageStore, MemoryStore, type MessageStore, type SeqStore } from './store.js';
 import {
   TcpTransport,
@@ -61,6 +68,8 @@ export interface SessionConfig {
   allowedMsgTypes?: string[];
   /** Connect over WebSocket to this URL (browser or Node) instead of TCP. */
   websocketUrl?: string;
+  /** Max bytes buffered for a single inbound message before the stream is rejected. Default 64 KiB. */
+  maxMessageSize?: number;
   /**
    * Acceptor only: validate an inbound Logon (credentials, CompID) and return
    * false to reject it. Set by {@link Acceptor}; not used by initiators.
@@ -186,6 +195,7 @@ export class Session extends EventEmitter {
       defaultApplVerId: config.defaultApplVerId,
       heartBtInt: config.heartBtInt ?? 30,
       resetOnLogon: config.resetOnLogon ?? false,
+      maxMessageSize: config.maxMessageSize ?? DEFAULT_MAX_MESSAGE_SIZE,
       username: config.username,
       password: config.password,
       rawData: config.rawData,
@@ -228,7 +238,7 @@ export class Session extends EventEmitter {
   connect(): void {
     this.intentionalClose = false;
     this.state = 'connecting';
-    this.parser = new FixParser();
+    this.parser = new FixParser(this.cfg.maxMessageSize);
     const transport = this.cfg.websocketUrl
       ? new WebSocketTransport(this.cfg.websocketUrl)
       : TcpTransport.dial({ host: this.cfg.host, port: this.cfg.port, tls: this.cfg.tls });
@@ -250,7 +260,7 @@ export class Session extends EventEmitter {
     this.role = 'acceptor';
     this.intentionalClose = false;
     this.state = 'connecting';
-    this.parser = new FixParser();
+    this.parser = new FixParser(this.cfg.maxMessageSize);
     this.bindTransport(new TcpTransport(socket)); // socket is already open
   }
 

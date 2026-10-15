@@ -6,7 +6,15 @@ export { MsgType, SOH, Tag } from './constants.js';
 export type { Dictionary, FieldDef, GroupSpec } from './dictionary.js';
 export { builtinDictionary, describe, getGroups, group, parseDictionary } from './dictionary.js';
 export type { Field } from './message.js';
-export { checksum, encode, FixMessage, FixParser, isChecksumValid, parse } from './message.js';
+export {
+  checksum,
+  DEFAULT_MAX_MESSAGE_SIZE,
+  encode,
+  FixMessage,
+  FixParser,
+  isChecksumValid,
+  parse,
+} from './message.js';
 export type { ReconnectOptions, SessionConfig, SessionEvents } from './session.js';
 export { Session } from './session.js';
 export type { MessageStore, SeqStore, StoredMessage } from './store.js';

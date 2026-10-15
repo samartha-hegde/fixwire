@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-15
+
+### Security
+
+- `FixParser` now bounds its buffer with a configurable `maxMessageSize` (default
+  64 KiB). A hostile or malformed peer that never completes a message, or declares
+  an over-large `BodyLength`, no longer grows memory without limit, the buffer is
+  reset and an error is thrown. Configurable via `new FixParser(maxBytes)` and the
+  `maxMessageSize` option on `Session` / `Acceptor`.
+
 ## [0.5.1] - 2026-10-15
 
 ### Changed
@@ -115,7 +125,8 @@ Initial public release. FIX 4.4, initiator (client) side.
 - `newOrderSingle` builder with `Side` / `OrdType` / `TimeInForce` constants.
 - TCP and TLS transport.
 
-[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/samartha-hegde/fixwire/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/samartha-hegde/fixwire/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/samartha-hegde/fixwire/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/samartha-hegde/fixwire/compare/v0.3.0...v0.4.0

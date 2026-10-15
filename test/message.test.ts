@@ -80,3 +80,25 @@ test('streaming parser frames split and batched messages', () => {
   assert.equal(done.length, 1);
   assert.equal(done[0]?.seqNum, 1);
 });
+
+test('FixParser rejects an unframed stream that outgrows maxMessageSize', () => {
+  const parser = new FixParser(64);
+  // Garbage with no valid BeginString, longer than the cap.
+  assert.throws(() => parser.append('x'.repeat(100)), /maxMessageSize/);
+});
+
+test('FixParser rejects an over-large declared BodyLength', () => {
+  const parser = new FixParser(64);
+  assert.throws(() => parser.append(`8=FIX.4.4${SOH}9=100000${SOH}`), /maxMessageSize/);
+});
+
+test('FixParser accepts normal messages under the cap', () => {
+  const parser = new FixParser(1024);
+  const wire = encode([
+    [35, '0'],
+    [49, 'A'],
+    [56, 'B'],
+    [34, '1'],
+  ]);
+  assert.equal(parser.append(wire).length, 1);
+});

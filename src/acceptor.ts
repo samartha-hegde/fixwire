@@ -31,6 +31,8 @@ export interface AcceptorConfig {
   dictionary?: Dictionary;
   /** Validate inbound application messages against the dictionary's required fields. */
   validateRequired?: boolean;
+  /** Max bytes buffered for a single inbound message before the stream is rejected. Default 64 KiB. */
+  maxMessageSize?: number;
   /** Factory for a fresh sequence store per connection. Default: in-memory. */
   createStore?: () => SeqStore;
   /** Factory for a fresh message store per connection. Default: in-memory. */
@@ -109,6 +111,7 @@ export class Acceptor extends EventEmitter {
       authenticate: this.cfg.authenticate,
       dictionary: this.cfg.dictionary,
       validateRequired: this.cfg.validateRequired,
+      maxMessageSize: this.cfg.maxMessageSize,
       store: (this.cfg.createStore ?? (() => new MemoryStore()))(),
       messageStore: (this.cfg.createMessageStore ?? (() => new MemoryMessageStore()))(),
     });

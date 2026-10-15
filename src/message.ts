@@ -99,12 +99,24 @@ export function isChecksumValid(raw: string): boolean {
   return checksum(body) === declared;
 }
 
+/** Default cap on a single buffered FIX message (64 KiB). Override via {@link FixParser}. */
+export const DEFAULT_MAX_MESSAGE_SIZE = 64 * 1024;
+
 /**
  * Streaming parser. TCP delivers partial/batched messages; feed raw chunks via
  * {@link append} and it emits only complete messages, framing them by BodyLength.
+ *
+ * To bound memory against a hostile or malformed peer (a stream that never
+ * completes a message, or an over-large declared BodyLength), the buffer is
+ * capped at `maxMessageSize`; exceeding it resets the buffer and throws.
  */
 export class FixParser {
   private buf = '';
+  private readonly maxMessageSize: number;
+
+  constructor(maxMessageSize: number = DEFAULT_MAX_MESSAGE_SIZE) {
+    this.maxMessageSize = maxMessageSize;
+  }
 
   append(chunk: string): FixMessage[] {
     this.buf += chunk;
@@ -113,6 +125,12 @@ export class FixParser {
       const msg = this.tryExtract();
       if (!msg) break;
       out.push(msg);
+    }
+    // Could not frame a message and the buffer has outgrown the cap: the stream
+    // is garbage or hostile. Reset so we don't keep growing, and signal.
+    if (this.buf.length > this.maxMessageSize) {
+      this.buf = '';
+      throw new Error(`unframed data exceeds maxMessageSize (${this.maxMessageSize} bytes)`);
     }
     return out;
   }
@@ -144,6 +162,12 @@ export class FixParser {
 
     const bodyStart = valEnd + 1;
     const msgEnd = bodyStart + bodyLen + CHECKSUM_FIELD_LEN;
+    if (msgEnd > this.maxMessageSize) {
+      this.buf = '';
+      throw new Error(
+        `declared BodyLength ${bodyLen} exceeds maxMessageSize (${this.maxMessageSize} bytes)`,
+      );
+    }
     if (buf.length < msgEnd) return null; // not fully arrived yet
 
     const raw = buf.slice(0, msgEnd);
