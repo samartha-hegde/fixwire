@@ -562,7 +562,7 @@
     <div class="stats wrap" style="margin-top:72px;">
       <div class="stats-grid">
         <div class="stat"><div class="n">0</div><div class="l">runtime deps</div></div>
-        <div class="stat"><div class="n">33</div><div class="l">tests passing</div></div>
+        <div class="stat"><div class="n">39</div><div class="l">tests passing</div></div>
         <div class="stat"><div class="n">3</div><div class="l">FIX versions</div></div>
         <div class="stat"><div class="n">2</div><div class="l">session roles</div></div>
         <div class="stat"><div class="n">MIT</div><div class="l">licensed</div></div>
@@ -704,12 +704,16 @@ session.on('message', (msg) => {
         <div class="feat"><div class="fk">35=3</div><h3>Inbound validation</h3><p>Checksum, CompID, BeginString and required-tag checks with Reject.</p></div>
         <div class="feat"><div class="fk">store</div><h3>Pluggable stores</h3><p>In-memory or file-backed sequence and message stores. Bring your own.</p></div>
         <div class="feat"><div class="fk">xml</div><h3>FIX dictionary</h3><p>Parse any QuickFIX spec, readable logs, typed-constant codegen.</p></div>
-        <div class="feat"><div class="fk">tls</div><h3>TCP &amp; TLS</h3><p>Plain or FIX-over-TLS transport with full connection options.</p></div>
+        <div class="feat"><div class="fk">tcp / ws</div><h3>TCP, TLS &amp; WebSocket</h3><p>Pluggable transport, run over a socket, or over WebSocket in the browser.</p></div>
         <div class="feat"><div class="fk">4.2 / 4.4 / 5.0</div><h3>Initiator + Acceptor</h3><p>Client and server roles, FIX 4.2 through 5.0 (FIXT.1.1).</p></div>
         <div class="feat"><div class="fk">NoXXX</div><h3>Repeating groups</h3><p>Extract group entries with getGroups, build them with the group() helper.</p></div>
         <div class="feat"><div class="fk">553 / 554</div><h3>Authentication</h3><p>Username, Password and RawData on logon; gate connections with an acceptor callback.</p></div>
         <div class="feat"><div class="fk">CompID</div><h3>Multi-counterparty</h3><p>One acceptor serves many initiators, learning each CompID from its Logon.</p></div>
-        <div class="feat"><div class="fk">dict</div><h3>Message validation</h3><p>Dictionary-driven required-field checks reject malformed application messages.</p></div>
+        <div class="feat"><div class="fk">dict</div><h3>Message validation</h3><p>Dictionary-driven required-field checks on inbound and outbound messages.</p></div>
+        <div class="feat"><div class="fk">component</div><h3>Components &amp; nesting</h3><p>Dictionary expands components and preserves nested repeating groups.</p></div>
+        <div class="feat"><div class="fk">metrics</div><h3>Observability</h3><p>A typed event stream for logging, plus sent / received / reject / reconnect counters.</p></div>
+        <div class="feat"><div class="fk">allow</div><h3>Message allowlist</h3><p>Reject unexpected inbound message types with a session Reject.</p></div>
+        <div class="feat"><div class="fk">mTLS</div><h3>Mutual TLS</h3><p>Client certificates on both the initiator and the acceptor.</p></div>
       </div>
     </div>
   </section>
@@ -738,8 +742,9 @@ session.on('message', (msg) => {
           <span class="pass">rejects a message missing SendingTime</span><br />
           <span class="pass">FIXT.1.1 logon carries DefaultApplVerID</span><br />
           <span class="pass">acceptor and initiator complete a full round-trip</span><br />
-          <span class="muted">  ... and 24 more</span>
-          <span class="summ">&#10003; 33 passing &middot; 0 failing</span>
+          <span class="pass">completes a logon + order round-trip over WebSocket</span><br />
+          <span class="muted">  ... and 29 more</span>
+          <span class="summ">&#10003; 39 passing &middot; 0 failing</span>
         </div>
       </div>
     </div>
