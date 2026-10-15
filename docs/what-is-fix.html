@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>What is FIX? The FIX protocol explained, and why the engine matters</title>
+<meta name="description" content="A plain-English, animated explainer of the FIX protocol: what a FIX message is, how a FIX session works (logon, heartbeats, sequence numbers), and why using a correct FIX engine like fixwire matters for TypeScript." />
+<meta name="keywords" content="what is FIX, FIX protocol explained, how does FIX work, FIX session, FIX message, Financial Information eXchange, FIX protocol tutorial, FIX engine" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#100e0a" />
+<link rel="canonical" href="https://samartha-hegde.github.io/fixwire/what-is-fix.html" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="What is FIX? The protocol explained" />
+<meta property="og:description" content="An animated, plain-English explainer of the FIX protocol and why a correct FIX engine matters." />
+<meta property="og:url" content="https://samartha-hegde.github.io/fixwire/what-is-fix.html" />
+<style>
+  :root {
+    --ground: #100e0a;
+    --ground-2: #15120c;
+    --panel: #1b1710;
+    --panel-2: #211c13;
+    --ink: #f3eee2;
+    --muted: #a99e88;
+    --faint: #6f6650;
+    --line: rgba(243, 238, 226, 0.09);
+    --line-strong: rgba(243, 238, 226, 0.16);
+    --amber: #f5a623;
+    --amber-bright: #ffbe4d;
+    --pass: #5bd38a;
+    --warn: #e8705a;
+    --cyan: #7fb2d8;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1000px 560px at 82% -10%, rgba(245, 166, 35, 0.09), transparent 60%),
+      var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.68;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--amber); text-decoration: none; }
+  a:hover { color: var(--amber-bright); }
+  .wrap { width: 100%; max-width: 860px; margin: 0 auto; padding: 0 24px; }
+  .nav { border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px); background: linear-gradient(var(--ground), rgba(16,14,10,0.7)); }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; max-width: 980px; }
+  .brand { font-family: var(--mono); font-weight: 700; color: var(--ink); }
+  .brand b { color: var(--amber); }
+  .nav .links a { color: var(--muted); font-size: 0.9rem; margin-left: 22px; }
+  .nav .links a:hover { color: var(--ink); }
+  header.hero { padding: 72px 0 24px; }
+  .eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--amber); margin: 0 0 16px; }
+  h1 { font-size: clamp(2.1rem, 5.2vw, 3.2rem); font-weight: 820; letter-spacing: -0.03em; line-height: 1.04; margin: 0; text-wrap: balance; }
+  h1 .accent { color: var(--amber); }
+  .lede { color: var(--muted); font-size: 1.12rem; margin: 22px 0 0; }
+  .lede b { color: var(--ink); font-weight: 600; }
+  section { padding: 44px 0; border-top: 1px solid var(--line); }
+  section:first-of-type { border-top: none; }
+  h2 { font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 740; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 26px; }
+  p { color: var(--muted); }
+  p b, li b { color: var(--ink); font-weight: 600; }
+
+  /* figure shell */
+  .fig { background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--line-strong); border-radius: 16px; padding: 26px; box-shadow: 0 30px 60px -40px rgba(0,0,0,0.7); }
+  .fig-cap { font-family: var(--mono); font-size: 0.74rem; color: var(--faint); letter-spacing: 0.04em; margin-top: 16px; text-align: center; }
+
+  /* fig 1: message anatomy */
+  .wire { font-family: var(--mono); font-size: clamp(0.72rem, 2.2vw, 0.92rem); line-height: 1.9; word-break: break-all; color: var(--muted); text-align: center; }
+  .wire .t { color: var(--amber); }
+  .wire .s { color: #3a342a; }
+  .decode { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 22px; }
+  .chip { border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; background: var(--ground-2); opacity: 0; transform: translateY(8px); transition: opacity .5s ease, transform .5s ease; }
+  .play .chip { opacity: 1; transform: none; }
+  .chip .tag { font-family: var(--mono); color: var(--amber); font-size: 0.78rem; }
+  .chip .name { font-weight: 600; font-size: 0.95rem; }
+  .chip .val { color: var(--muted); font-size: 0.85rem; }
+
+  /* fig 2: session flow */
+  .lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 0; position: relative; }
+  .lane-h { font-family: var(--mono); font-size: 0.8rem; color: var(--ink); text-align: center; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+  .lane-h .who { color: var(--amber); }
+  .flow { grid-column: 1 / 3; display: flex; flex-direction: column; gap: 12px; padding-top: 18px; }
+  .hop { display: flex; align-items: center; gap: 12px; opacity: 0; transform: translateY(8px); transition: opacity .45s ease, transform .45s ease; }
+  .play .hop { opacity: 1; transform: none; }
+  .hop .arrow { flex: 1; height: 1px; position: relative; background: linear-gradient(90deg, var(--line-strong), var(--line-strong)); }
+  .hop .arrow::after { content: ""; position: absolute; top: -3px; width: 7px; height: 7px; border-top: 1.5px solid var(--amber); border-right: 1.5px solid var(--amber); }
+  .hop.out .arrow::after { right: 0; transform: rotate(45deg); }
+  .hop.in .arrow { background: linear-gradient(90deg, var(--line-strong), var(--line-strong)); }
+  .hop.in .arrow::after { left: 0; transform: rotate(-135deg); border-color: var(--cyan); }
+  .hop.in .arrow { background: var(--line-strong); }
+  .pill { font-family: var(--mono); font-size: 0.78rem; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--ground-2); white-space: nowrap; }
+  .pill .seq { color: var(--faint); }
+  .hop.out .pill { color: var(--amber); }
+  .hop.in .pill { color: var(--cyan); }
+  .hop.done .pill { color: var(--pass); border-color: rgba(91,211,138,0.4); }
+
+  /* fig 3: gap & resend */
+  .seqrow { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .tile { width: 54px; height: 54px; border-radius: 10px; border: 1px solid var(--line-strong); display: grid; place-items: center; font-family: var(--mono); font-weight: 700; font-size: 1.1rem; background: var(--ground-2); color: var(--ink); }
+  .tile.ok { border-color: rgba(91,211,138,0.4); color: var(--pass); }
+  .tile.gap { border-color: rgba(232,112,90,0.6); color: var(--warn); position: relative; }
+  .tile.filling { color: var(--faint); }
+  .play .tile.filling { animation: fill 0.6s ease 1.8s forwards; }
+  @keyframes fill { to { color: var(--pass); border-color: rgba(91,211,138,0.5); } }
+  .resend { text-align: center; font-family: var(--mono); font-size: 0.82rem; color: var(--warn); margin-top: 18px; opacity: 0; }
+  .play .resend { animation: pulsein 0.5s ease 0.9s forwards; }
+  @keyframes pulsein { to { opacity: 1; } }
+  .resend .arrow-back { color: var(--amber); }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 22px; }
+  .compare > div { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-size: 0.9rem; }
+  .compare .bad { border-left: 3px solid var(--warn); }
+  .compare .good { border-left: 3px solid var(--pass); }
+  .compare h4 { margin: 0 0 6px; font-size: 0.82rem; font-family: var(--mono); letter-spacing: 0.04em; }
+  .compare .bad h4 { color: var(--warn); }
+  .compare .good h4 { color: var(--pass); }
+  .compare p { margin: 0; color: var(--muted); }
+
+  ul { color: var(--muted); padding-left: 20px; }
+  li { margin: 7px 0; }
+
+  .cta-band { border: 1px solid var(--line-strong); border-radius: 18px; padding: 44px 32px; text-align: center; background: radial-gradient(500px 240px at 50% -30%, rgba(245,166,35,0.13), transparent 70%), linear-gradient(180deg, var(--panel-2), var(--ground-2)); }
+  .cta-band h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); border: none; }
+  .cta-band p { max-width: 50ch; margin: 12px auto 24px; }
+  .btn { display: inline-block; font-weight: 600; padding: 12px 20px; border-radius: 10px; font-size: 0.95rem; border: 1px solid var(--line-strong); color: var(--ink); margin: 0 6px; }
+  .btn-primary { background: var(--amber); color: #1a1304; border-color: var(--amber); }
+  footer { border-top: 1px solid var(--line); margin-top: 24px; padding: 30px 0 60px; }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  footer, footer a { color: var(--faint); font-size: 0.85rem; }
+
+  @media (max-width: 620px) {
+    .compare { grid-template-columns: 1fr; }
+    .nav .links a:first-child { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chip, .hop { opacity: 1; transform: none; transition: none; }
+    .resend { opacity: 1; animation: none; }
+    .tile.filling { color: var(--pass); border-color: rgba(91,211,138,0.5); animation: none; }
+  }
+</style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="wrap">
+      <a class="brand" href="./">fix<b>wire</b></a>
+      <span class="links">
+        <a href="#message">The message</a>
+        <a href="#session">The session</a>
+        <a href="#why">Why it matters</a>
+        <a href="https://github.com/samartha-hegde/fixwire">GitHub</a>
+      </span>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">FIX protocol, explained</p>
+      <h1>What is <span class="accent">FIX</span>, and why does the engine matter?</h1>
+      <p class="lede">
+        FIX (Financial Information eXchange) is the messaging protocol the financial industry
+        uses to trade electronically. When a firm sends an order to an exchange or a liquidity
+        provider, it almost always speaks FIX. It looks simple, <b>plain tag=value text</b>, but
+        the session underneath is where correctness lives. Here is how it works, with pictures.
+      </p>
+    </div>
+  </header>
+
+  <section id="message">
+    <div class="wrap">
+      <h2>1. A FIX message is just tag=value</h2>
+      <p class="sub">
+        Every message is a list of numbered fields separated by a control character (SOH, shown
+        here as <code>|</code>): a header saying who and what and in what order, a body, and a
+        checksum. Numbers are compact and fast to parse.
+      </p>
+      <div class="fig" data-anim>
+        <div class="wire">
+          <span class="t">8</span>=FIX.4.4<span class="s">|</span><span class="t">35</span>=D<span class="s">|</span><span class="t">34</span>=2<span class="s">|</span><span class="t">49</span>=CLIENT<span class="s">|</span><span class="t">56</span>=VENUE<span class="s">|</span><span class="t">11</span>=order-1<span class="s">|</span><span class="t">55</span>=BTC/USD<span class="s">|</span><span class="t">54</span>=1<span class="s">|</span><span class="t">38</span>=1<span class="s">|</span><span class="t">44</span>=65000<span class="s">|</span><span class="t">10</span>=092
+        </div>
+        <div class="decode">
+          <div class="chip" style="transition-delay:.05s"><div class="tag">35</div><div class="name">MsgType</div><div class="val">D = New Order</div></div>
+          <div class="chip" style="transition-delay:.15s"><div class="tag">34</div><div class="name">MsgSeqNum</div><div class="val">2</div></div>
+          <div class="chip" style="transition-delay:.25s"><div class="tag">11</div><div class="name">ClOrdID</div><div class="val">order-1</div></div>
+          <div class="chip" style="transition-delay:.35s"><div class="tag">55</div><div class="name">Symbol</div><div class="val">BTC/USD</div></div>
+          <div class="chip" style="transition-delay:.45s"><div class="tag">54</div><div class="name">Side</div><div class="val">1 = Buy</div></div>
+          <div class="chip" style="transition-delay:.55s"><div class="tag">44</div><div class="name">Price</div><div class="val">65000</div></div>
+        </div>
+        <div class="fig-cap">one NewOrderSingle, decoded from the wire</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="session">
+    <div class="wrap">
+      <h2>2. FIX is a session, not request/response</h2>
+      <p class="sub">
+        Both sides open a long-lived connection and <b>log on</b>. They exchange heartbeats to
+        prove the link is alive, and they <b>number every message</b> so neither side ever
+        silently misses one. Orders and execution reports flow over that ordered session.
+      </p>
+      <div class="fig" data-anim>
+        <div class="lanes">
+          <div class="lane-h"><span class="who">Initiator</span> (your app)</div>
+          <div class="lane-h"><span class="who">Acceptor</span> (the venue)</div>
+          <div class="flow">
+            <div class="hop out" style="transition-delay:.1s"><span class="pill">Logon <span class="seq">· 35=A · 34=1</span></span><span class="arrow"></span></div>
+            <div class="hop in" style="transition-delay:.5s"><span class="arrow"></span><span class="pill">Logon <span class="seq">· 34=1</span></span></div>
+            <div class="hop out" style="transition-delay:.9s"><span class="pill">Heartbeat <span class="seq">· 35=0</span></span><span class="arrow"></span></div>
+            <div class="hop out" style="transition-delay:1.3s"><span class="pill">NewOrderSingle <span class="seq">· 35=D · 34=2</span></span><span class="arrow"></span></div>
+            <div class="hop in done" style="transition-delay:1.7s"><span class="arrow"></span><span class="pill">ExecutionReport <span class="seq">· 35=8 · 34=2</span></span></div>
+          </div>
+        </div>
+        <div class="fig-cap">logon handshake, a heartbeat, an order, and a fill</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why">
+    <div class="wrap">
+      <h2>3. Why the right engine matters</h2>
+      <p class="sub">
+        Encoding tag=value is a weekend. The <b>session</b> is the hard part. Suppose message 4
+        never arrives, but 5 does. Watch what a correct engine does:
+      </p>
+      <div class="fig" data-anim>
+        <div class="seqrow">
+          <div class="tile ok">1</div>
+          <div class="tile ok">2</div>
+          <div class="tile ok">3</div>
+          <div class="tile gap filling">4</div>
+          <div class="tile ok">5</div>
+        </div>
+        <div class="resend">message 4 missing → <span class="arrow-back">◀ ResendRequest</span> → gap filled, sequence intact</div>
+        <div class="compare">
+          <div class="bad">
+            <h4>A byte parser only</h4>
+            <p>Hands you message 5 and moves on. Message 4 is silently lost, and now your
+              positions and order state are wrong, discovered later, at the worst time.</p>
+          </div>
+          <div class="good">
+            <h4>A correct session engine</h4>
+            <p>Notices the sequence gap, sends a ResendRequest, recovers message 4, and keeps
+              your order flow consistent, automatically.</p>
+          </div>
+        </div>
+        <div class="fig-cap">sequence-gap detection and resend recovery</div>
+      </div>
+      <p style="margin-top:26px;">
+        That is the whole reason a real FIX engine exists. Beyond resend, it handles reconnects,
+        duplicate detection, sequence resets, heartbeats, and strict validation, the dozen quiet
+        edge cases that separate a demo from something you trust with real money.
+      </p>
+      <ul>
+        <li><b>Correctness, tested:</b> fixwire is verified against the real QuickFIX (C++),
+          quickfixgo (Go), and QuickFIX/J (Java) engines, across FIX 4.2, 4.4, and 5.0.</li>
+        <li><b>Fast:</b> it parses a typical message in about <b>1.3 microseconds</b>
+          (run <code>npm run bench</code>).</li>
+        <li><b>Zero dependencies, MIT:</b> read it in an afternoon, ship it for free.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="cta-band">
+        <h2>Build on a FIX layer you can trust.</h2>
+        <p>fixwire is a modern, fully-typed FIX engine for TypeScript, initiator and acceptor, free under MIT.</p>
+        <div>
+          <a class="btn btn-primary" href="https://github.com/samartha-hegde/fixwire">Get started on GitHub</a>
+          <a class="btn" href="./">fixwire overview</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <span>fix<b style="color:var(--amber)">wire</b> · the FIX engine TypeScript deserves</span>
+      <span><a href="./">Home</a> · <a href="https://www.npmjs.com/package/fixwire">npm</a> · <a href="./vs-fixparser.html">vs FIXParser</a></span>
+    </div>
+  </footer>
+
+  <script>
+    // Play each figure's animation when it scrolls into view.
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const figs = document.querySelectorAll('[data-anim]');
+    if (reduce) {
+      figs.forEach((f) => f.classList.add('play'));
+    } else {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) { e.target.classList.add('play'); io.unobserve(e.target); }
+        });
+      }, { threshold: 0.35 });
+      figs.forEach((f) => io.observe(f));
+    }
+  </script>
+</body>
+</html>
