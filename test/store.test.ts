@@ -51,3 +51,12 @@ test('MemoryMessageStore stores and retrieves by sequence', () => {
   store.reset();
   assert.equal(store.get(2), undefined);
 });
+
+test('message stores expose retained entries ordered by sequence', () => {
+  const store = new MemoryMessageStore();
+  store.put({ seq: 3, msgType: 'D', body: [[11, 'o-3']], sendingTime: 't3' });
+  store.put({ seq: 1, msgType: 'A', body: [], sendingTime: 't1' });
+  store.put({ seq: 2, msgType: 'D', body: [[11, 'o-2']], sendingTime: 't2' });
+  const seqs = store.entries().map((m) => m.seq);
+  assert.deepEqual(seqs, [1, 2, 3]);
+});

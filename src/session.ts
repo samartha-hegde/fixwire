@@ -11,7 +11,13 @@ import {
   isChecksumValid,
 } from './message.js';
 import { isWithinSchedule, msUntilNextStart, msUntilTime, type Schedule } from './schedule.js';
-import { MemoryMessageStore, MemoryStore, type MessageStore, type SeqStore } from './store.js';
+import {
+  MemoryMessageStore,
+  MemoryStore,
+  type MessageStore,
+  type SeqStore,
+  type StoredMessage,
+} from './store.js';
 import {
   TcpTransport,
   type Transport,
@@ -243,6 +249,11 @@ export class Session extends EventEmitter {
       rejectsReceived: this.rejectCount,
       reconnects: this.reconnectCount,
     };
+  }
+
+  /** The retained outbound message history, ordered by sequence number (audit/debug). */
+  history(): StoredMessage[] {
+    return this.messages.entries();
   }
 
   /**

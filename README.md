@@ -218,8 +218,13 @@ npm test
 ✔ scheduled session connects inside the window and stays idle outside it
 ✔ schedule respects allowed weekdays and holidays
 ✔ attachLogger / attachMetrics bridge the event stream
-  …55 passing
+✔ history() returns the outbound message log for audit
+  …58 passing
 ```
+
+Decode a FIX message in your browser at the
+[**playground**](https://samartha-hegde.github.io/fixwire/playground.html), which
+runs fixwire's codec client-side, no server, nothing uploaded.
 
 ## Performance
 
@@ -305,11 +310,13 @@ Shipped:
 - [x] Session scheduling (daily window + sequence reset via `schedule`)
 - [x] Richer schedules: allowed weekdays and holiday dates
 - [x] Observability adapters: `attachLogger` (pino) and `attachMetrics` (OTel/Prometheus)
+- [x] Message-recovery helpers: `session.history()` and `MessageStore.entries()`
+- [x] Interactive browser [playground](https://samartha-hegde.github.io/fixwire/playground.html) (decode & validate)
 
 Next, in rough order:
 
-- [ ] Message recovery helpers (replay a session's history for audit/debug)
-- [ ] A hosted interactive playground (encode/decode/validate in the browser)
+- [ ] Dictionary-driven typed message classes (codegen beyond tag constants)
+- [ ] A persistent queue-backed `MessageStore` (Redis / SQL) for horizontal scale
 
 **FIXP / SBE (binary FIX)** is intentionally out of scope for now: it is a
 different session protocol and a schema-driven binary codec, effectively a second

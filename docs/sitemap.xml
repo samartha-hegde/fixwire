@@ -13,6 +13,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://samartha-hegde.github.io/fixwire/playground.html</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://samartha-hegde.github.io/fixwire/vs-fixparser.html</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>monthly</changefreq>

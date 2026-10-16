@@ -175,3 +175,12 @@ test('builtinDictionary maps the bundled Tag constants', () => {
   assert.equal(dict.byName.get('ClOrdID'), 11);
   assert.equal(dict.byTag.get(35)?.name, 'MsgType');
 });
+
+test('parseDictionary handles single-quoted attributes', () => {
+  const dict = parseDictionary(
+    "<fix major='4' minor='4'><messages><message name='Heartbeat' msgtype='0'/></messages>" +
+      "<fields><field number='11' name='ClOrdID' type='STRING'/></fields></fix>",
+  );
+  assert.equal(dict.byName.get('ClOrdID'), 11);
+  assert.equal(dict.messages.get('0'), 'Heartbeat');
+});

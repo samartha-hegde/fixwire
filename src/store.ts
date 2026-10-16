@@ -107,7 +107,14 @@ export interface StoredMessage {
 export interface MessageStore {
   put(msg: StoredMessage): void;
   get(seq: number): StoredMessage | undefined;
+  /** All retained outbound messages, ordered by sequence number (for audit/replay). */
+  entries(): StoredMessage[];
   reset(): void;
+}
+
+/** Return a store's retained messages ordered by sequence number. */
+function sortedEntries(map: Map<number, StoredMessage>): StoredMessage[] {
+  return [...map.values()].sort((a, b) => a.seq - b.seq);
 }
 
 /**
@@ -122,6 +129,9 @@ export class MemoryMessageStore implements MessageStore {
   }
   get(seq: number): StoredMessage | undefined {
     return this.map.get(seq);
+  }
+  entries(): StoredMessage[] {
+    return sortedEntries(this.map);
   }
   reset(): void {
     this.map.clear();
@@ -159,6 +169,10 @@ export class FileMessageStore implements MessageStore {
 
   get(seq: number): StoredMessage | undefined {
     return this.map.get(seq);
+  }
+
+  entries(): StoredMessage[] {
+    return sortedEntries(this.map);
   }
 
   reset(): void {

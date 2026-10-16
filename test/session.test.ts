@@ -573,3 +573,24 @@ test('scheduled session stays idle outside the window', async () => {
   session.disconnect();
   acc.close();
 });
+
+test('history() returns the outbound message log for audit', async () => {
+  const acc = await startAcceptor((msg, send) => {
+    if (msg.msgType === MsgType.Logon) replyLogon(send);
+  });
+  const session = newSession(acc.port);
+  await new Promise<void>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('logon', () => {
+      session.send(MsgType.NewOrderSingle, [[Tag.ClOrdID, 'audit-1']]);
+      resolve();
+    });
+    session.connect();
+  });
+  const history = session.history();
+  assert.ok(history.some((m) => m.msgType === MsgType.Logon));
+  const order = history.find((m) => m.msgType === MsgType.NewOrderSingle);
+  assert.equal(order?.body.find(([t]) => t === Tag.ClOrdID)?.[1], 'audit-1');
+  session.disconnect();
+  acc.close();
+});

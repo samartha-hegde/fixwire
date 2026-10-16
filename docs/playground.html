@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FIX message decoder & validator (online) · fixwire</title>
+<meta name="description" content="Paste a raw FIX message and decode it: field names, values, enum meanings, checksum and body-length validation. A free online FIX decoder running entirely in your browser, powered by fixwire." />
+<meta name="keywords" content="FIX message decoder, FIX parser online, FIX validator, decode FIX message, FIX protocol tool, FIX checksum, online FIX decoder" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#100e0a" />
+<link rel="canonical" href="https://samartha-hegde.github.io/fixwire/playground.html" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="FIX message decoder & validator (online)" />
+<meta property="og:description" content="Decode and validate a raw FIX message in your browser. Free, powered by fixwire." />
+<meta property="og:url" content="https://samartha-hegde.github.io/fixwire/playground.html" />
+<style>
+  :root {
+    --ground: #100e0a; --ground-2: #15120c; --panel: #1b1710; --panel-2: #211c13;
+    --ink: #f3eee2; --muted: #a99e88; --faint: #6f6650;
+    --line: rgba(243, 238, 226, 0.09); --line-strong: rgba(243, 238, 226, 0.16);
+    --amber: #f5a623; --amber-bright: #ffbe4d; --pass: #5bd38a; --warn: #e8705a;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(1000px 520px at 82% -10%, rgba(245,166,35,0.08), transparent 60%), var(--ground);
+    color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--amber); text-decoration: none; }
+  a:hover { color: var(--amber-bright); }
+  .wrap { width: 100%; max-width: 940px; margin: 0 auto; padding: 0 24px; }
+  .nav { border-bottom: 1px solid var(--line); }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .brand { font-family: var(--mono); font-weight: 700; color: var(--ink); }
+  .brand b { color: var(--amber); }
+  .nav .links a { color: var(--muted); font-size: 0.9rem; margin-left: 22px; }
+  .nav .links a:hover { color: var(--ink); }
+  header.hero { padding: 54px 0 24px; }
+  .eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--amber); margin: 0 0 14px; }
+  h1 { font-size: clamp(1.9rem, 4.5vw, 2.8rem); font-weight: 800; letter-spacing: -0.03em; margin: 0; line-height: 1.05; }
+  .lede { color: var(--muted); margin: 16px 0 0; max-width: 64ch; }
+  .lede b { color: var(--ink); }
+  section { padding: 10px 0 44px; }
+  label.lbl { display: block; font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  textarea {
+    width: 100%; min-height: 110px; resize: vertical; padding: 14px 16px;
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line-strong);
+    border-radius: 12px; font-family: var(--mono); font-size: 0.86rem; line-height: 1.6;
+  }
+  textarea:focus { outline: 2px solid var(--amber); outline-offset: 1px; }
+  .controls { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  button {
+    font-family: var(--sans); font-weight: 600; font-size: 0.9rem; cursor: pointer;
+    padding: 10px 18px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink);
+  }
+  button.primary { background: var(--amber); color: #1a1304; border-color: var(--amber); }
+  button:hover { border-color: var(--amber-dim, var(--amber)); }
+  .note { color: var(--faint); font-size: 0.82rem; }
+  .summary { display: flex; gap: 10px; flex-wrap: wrap; margin: 24px 0 14px; }
+  .chip { font-family: var(--mono); font-size: 0.8rem; padding: 8px 14px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--ground-2); }
+  .chip .k { color: var(--faint); }
+  .chip.ok { border-color: rgba(91,211,138,0.4); } .chip.ok .v { color: var(--pass); }
+  .chip.bad { border-color: rgba(232,112,90,0.5); } .chip.bad .v { color: var(--warn); }
+  .chip .v { color: var(--ink); font-weight: 600; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line-strong); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 560px; }
+  th, td { text-align: left; padding: 10px 16px; border-top: 1px solid var(--line); }
+  thead th { border-top: none; font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.04em; color: var(--muted); }
+  td.tag { font-family: var(--mono); color: var(--amber); width: 68px; }
+  td.name { font-weight: 600; }
+  td.val { font-family: var(--mono); color: var(--ink); word-break: break-all; }
+  td.mean { color: var(--muted); }
+  tr.header-field td.name, tr.header-field td.tag { color: var(--faint); }
+  .err { color: var(--warn); font-family: var(--mono); font-size: 0.86rem; padding: 14px 0; }
+  footer { border-top: 1px solid var(--line); margin-top: 20px; padding: 26px 0 56px; color: var(--faint); font-size: 0.85rem; }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+</style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="wrap">
+      <a class="brand" href="./">fix<b>wire</b></a>
+      <span class="links">
+        <a href="./what-is-fix.html">What is FIX?</a>
+        <a href="https://github.com/samartha-hegde/fixwire">GitHub</a>
+      </span>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">FIX playground</p>
+      <h1>Decode &amp; validate a FIX message.</h1>
+      <p class="lede">
+        Paste a raw FIX message below. It is decoded against the <b>FIX 4.4</b> dictionary
+        (field names, enum meanings) and checked for a valid checksum and body length, all
+        <b>in your browser</b>, powered by fixwire. Nothing is sent anywhere.
+      </p>
+    </div>
+  </header>
+
+  <section>
+    <div class="wrap">
+      <label class="lbl" for="input">Raw FIX message</label>
+      <textarea id="input" spellcheck="false">8=FIX.4.4|9=125|35=D|49=CLIENT|56=VENUE|34=2|52=20260101-12:00:00.000|11=order-1|55=BTC/USD|54=1|38=1|40=2|44=65000|60=20260101-12:00:00.000|10=201|</textarea>
+      <div class="controls">
+        <button class="primary" id="decode">Decode</button>
+        <button id="sample">Load sample</button>
+        <span class="note">Separators: SOH, <code>|</code>, <code>^</code>, or newlines all work.</span>
+      </div>
+      <div id="output"></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <span>Powered by <a href="./">fixwire</a> running in your browser.</span>
+      <span><a href="./">Home</a> · <a href="https://www.npmjs.com/package/fixwire">npm</a> · <a href="./what-is-fix.html">What is FIX?</a></span>
+    </div>
+  </footer>
+
+  <script type="module">
+    import { parse, checksum, SOH } from './playground.js';
+
+    const SAMPLE = document.getElementById('input').value;
+    let dict = { byTag: {}, messages: {} };
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const HEADER_TAGS = new Set([8, 9, 35, 34, 49, 56, 52, 43, 122]);
+    const TRAILER_TAGS = new Set([10]);
+
+    function normalize(input) {
+      let s = input.trim().replace(/[|\^␁\n\r\t]+/g, SOH);
+      s = s.replace(new RegExp(`${SOH}+`, 'g'), SOH);
+      if (!s.endsWith(SOH)) s += SOH;
+      return s;
+    }
+
+    function validateChecksum(raw) {
+      const i = raw.lastIndexOf(`${SOH}10=`);
+      if (i === -1) return null;
+      const body = raw.slice(0, i + 1);
+      const declared = raw.slice(i + 4, i + 7);
+      return { declared, computed: checksum(body) };
+    }
+
+    function validateBodyLength(raw) {
+      const blStart = raw.indexOf(`${SOH}9=`);
+      if (blStart === -1) return null;
+      const valStart = blStart + 3;
+      const valEnd = raw.indexOf(SOH, valStart);
+      const csStart = raw.lastIndexOf(`${SOH}10=`);
+      if (valEnd === -1 || csStart === -1) return null;
+      return { declared: raw.slice(valStart, valEnd), computed: String(csStart + 1 - (valEnd + 1)) };
+    }
+
+    function render() {
+      const out = document.getElementById('output');
+      const raw = normalize(document.getElementById('input').value);
+      if (raw === SOH) { out.innerHTML = ''; return; }
+      let msg;
+      try { msg = parse(raw); } catch (e) { out.innerHTML = `<p class="err">Could not parse: ${esc(e.message)}</p>`; return; }
+      if (!msg.fields.length) { out.innerHTML = '<p class="err">No FIX fields found.</p>'; return; }
+
+      const mt = msg.get(35);
+      const mtName = mt ? (dict.messages[mt] || 'Unknown') : '—';
+      const cs = validateChecksum(raw);
+      const bl = validateBodyLength(raw);
+
+      const chip = (label, ok, value) =>
+        `<span class="chip ${ok === null ? '' : ok ? 'ok' : 'bad'}"><span class="k">${label}</span> <span class="v">${esc(value)}</span></span>`;
+
+      let summary = `<div class="summary">${chip('MsgType', null, `${mt ?? '?'} ${mtName}`)}`;
+      if (cs) summary += chip('Checksum', cs.declared === cs.computed, cs.declared === cs.computed ? `valid (${cs.declared})` : `declared ${cs.declared}, expected ${cs.computed}`);
+      if (bl) summary += chip('BodyLength', bl.declared === bl.computed, bl.declared === bl.computed ? `valid (${bl.declared})` : `declared ${bl.declared}, expected ${bl.computed}`);
+      summary += '</div>';
+
+      let rows = '';
+      for (const [tag, value] of msg.fields) {
+        const def = dict.byTag[tag];
+        const name = def ? def.name : '—';
+        const mean = def && def.values ? (def.values[value] || '') : '';
+        const cls = HEADER_TAGS.has(tag) || TRAILER_TAGS.has(tag) ? ' class="header-field"' : '';
+        rows += `<tr${cls}><td class="tag">${tag}</td><td class="name">${esc(name)}</td><td class="val">${esc(value)}</td><td class="mean">${esc(mean)}</td></tr>`;
+      }
+      out.innerHTML = summary +
+        `<div class="table-wrap"><table><thead><tr><th>Tag</th><th>Field</th><th>Value</th><th>Meaning</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+
+    document.getElementById('decode').addEventListener('click', render);
+    document.getElementById('sample').addEventListener('click', () => { document.getElementById('input').value = SAMPLE; render(); });
+    document.getElementById('input').addEventListener('input', render);
+
+    fetch('./fix44.dict.json')
+      .then((r) => r.json())
+      .then((d) => { dict = d; render(); })
+      .catch(() => render());
+  </script>
+</body>
+</html>

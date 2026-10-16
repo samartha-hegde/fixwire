@@ -28,7 +28,8 @@ export interface Dictionary {
   required: Map<string, number[]>;
 }
 
-const ATTR = /(\w+)\s*=\s*"([^"]*)"/g;
+// Attribute values may be double- or single-quoted (FIX dictionaries use either).
+const ATTR = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
 const FIELD = /<field\s+([^>]*?)\/>|<field\s+([^>]*?)>([\s\S]*?)<\/field>/g;
 const VALUE = /<value\s+([^>]*?)\/?>/g;
 const MESSAGE_BLOCK = /<message\s+([^>]*?)>([\s\S]*?)<\/message>|<message\s+([^>]*?)\/>/g;
@@ -74,7 +75,8 @@ function attrs(s: string): Record<string, string> {
   ATTR.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = ATTR.exec(s)) !== null) {
-    const [, key, value] = m;
+    const key = m[1];
+    const value = m[2] ?? m[3]; // double- or single-quoted
     if (key !== undefined && value !== undefined) out[key] = value;
   }
   return out;

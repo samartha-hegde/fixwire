@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-16
+
+### Added
+
+- **Message-recovery helpers**: `MessageStore.entries()` returns the retained
+  outbound messages ordered by sequence number, and `Session.history()` exposes
+  the sent message log for audit/debug.
+
+### Fixed
+
+- `parseDictionary` now accepts single-quoted XML attributes, not just
+  double-quoted. Real FIX dictionaries use either (e.g. QuickFIX spec files), so
+  single-quoted dictionaries previously parsed as empty.
+
 ## [0.7.0] - 2026-10-16
 
 ### Added
@@ -158,7 +172,8 @@ Initial public release. FIX 4.4, initiator (client) side.
 - `newOrderSingle` builder with `Side` / `OrdType` / `TimeInForce` constants.
 - TCP and TLS transport.
 
-[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/samartha-hegde/fixwire/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/samartha-hegde/fixwire/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/samartha-hegde/fixwire/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/samartha-hegde/fixwire/compare/v0.5.1...v0.5.2
