@@ -184,10 +184,12 @@ with `Side` / `OrdType` / `TimeInForce`.
 - **Transports** - TCP, TLS, and WebSocket (`websocketUrl`, for browser and Node),
   on both sides: dial with a `Session` or serve with `acceptWebSocket` over your
   own WS server. Or implement the `Transport` interface for your own medium.
-- **Scheduling** - a daily session window (`schedule`): connect inside it, log out
-  at its end, and reconnect with a fresh sequence at the next start.
-- **Observability** - a typed event stream to pipe into any logger, plus a
-  `session.metrics` counter (sent / received / rejects / reconnects).
+- **Scheduling** - a session window (`schedule`): a daily UTC window with optional
+  allowed weekdays and holiday dates. The initiator connects inside it, logs out at
+  its end, and reconnects with a fresh sequence at the next valid start.
+- **Observability** - a typed event stream, `session.metrics` counters, and
+  ready-made bridges: `attachLogger(session, pino)` and
+  `attachMetrics(session, record)` (OpenTelemetry / Prometheus / StatsD).
 - **Message-type allowlist** - `allowedMsgTypes` rejects unexpected inbound
   message types with a session Reject.
 - **Pluggable persistence** - in-memory by default; `FileStore` / `FileMessageStore`
@@ -214,7 +216,9 @@ npm test
 ✔ completes a logon + order round-trip over a WebSocket transport
 ✔ fixwire acceptor over WebSocket round-trips with a fixwire initiator
 ✔ scheduled session connects inside the window and stays idle outside it
-  …49 passing
+✔ schedule respects allowed weekdays and holidays
+✔ attachLogger / attachMetrics bridge the event stream
+  …55 passing
 ```
 
 ## Performance
@@ -299,11 +303,13 @@ Shipped:
 - [x] WebSocket transport (`websocketUrl`) for browser and Node
 - [x] Acceptor-side WebSocket (`acceptWebSocket`, bring your own WS server)
 - [x] Session scheduling (daily window + sequence reset via `schedule`)
+- [x] Richer schedules: allowed weekdays and holiday dates
+- [x] Observability adapters: `attachLogger` (pino) and `attachMetrics` (OTel/Prometheus)
 
 Next, in rough order:
 
-- [ ] Richer schedules (weekly windows, per-day exceptions, holidays)
-- [ ] Pluggable observability adapters (ready-made pino / OpenTelemetry bridges)
+- [ ] Message recovery helpers (replay a session's history for audit/debug)
+- [ ] A hosted interactive playground (encode/decode/validate in the browser)
 
 **FIXP / SBE (binary FIX)** is intentionally out of scope for now: it is a
 different session protocol and a schema-driven binary codec, effectively a second

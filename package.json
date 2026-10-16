@@ -1,6 +1,6 @@
 {
   "name": "fixwire",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "A modern, fully-typed FIX protocol library for TypeScript. A QuickFIX-style engine with a correct session layer, zero dependencies, initiator and acceptor, FIX 4.2 to 5.0.",
   "type": "module",
   "license": "MIT",

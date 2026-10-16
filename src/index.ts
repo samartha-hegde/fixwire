@@ -15,8 +15,10 @@ export {
   isChecksumValid,
   parse,
 } from './message.js';
+export type { AttachLoggerOptions, Logger } from './observability.js';
+export { attachLogger, attachMetrics } from './observability.js';
 export type { Schedule } from './schedule.js';
-export { isWithinSchedule, msUntilTime } from './schedule.js';
+export { isWithinSchedule, msUntilNextStart, msUntilTime } from './schedule.js';
 export type { ReconnectOptions, SessionConfig, SessionEvents } from './session.js';
 export { Session } from './session.js';
 export type { MessageStore, SeqStore, StoredMessage } from './store.js';

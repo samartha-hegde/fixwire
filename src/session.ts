@@ -10,7 +10,7 @@ import {
   FixParser,
   isChecksumValid,
 } from './message.js';
-import { isWithinSchedule, msUntilTime, type Schedule } from './schedule.js';
+import { isWithinSchedule, msUntilNextStart, msUntilTime, type Schedule } from './schedule.js';
 import { MemoryMessageStore, MemoryStore, type MessageStore, type SeqStore } from './store.js';
 import {
   TcpTransport,
@@ -280,7 +280,7 @@ export class Session extends EventEmitter {
     if (!schedule) return;
     this.clearScheduleTimer();
     const now = new Date();
-    if (isWithinSchedule(now, schedule.startTime, schedule.endTime)) {
+    if (isWithinSchedule(now, schedule)) {
       // New daily session: reset sequence numbers at the start of the window.
       this.store.reset();
       this.messages.reset();
@@ -290,10 +290,8 @@ export class Session extends EventEmitter {
         msUntilTime(now, schedule.endTime),
       );
     } else {
-      this.scheduleTimer = setTimeout(
-        () => this.runSchedule(),
-        msUntilTime(now, schedule.startTime),
-      );
+      // Wait for the next start that falls on an allowed, non-holiday day.
+      this.scheduleTimer = setTimeout(() => this.runSchedule(), msUntilNextStart(now, schedule));
     }
     this.scheduleTimer?.unref?.();
   }

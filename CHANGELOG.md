@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-16
+
+### Added
+
+- **Richer schedules**: `Schedule` gains `days` (allowed weekdays) and `holidays`
+  (closed `YYYY-MM-DD` dates). `isWithinSchedule` is overnight-aware (the morning of
+  a cross-midnight window belongs to the previous day), and a new `msUntilNextStart`
+  skips disabled days and holidays. A scheduled session reconnects at the next valid
+  start.
+- **Observability adapters**: `attachLogger(session, logger)` bridges the event
+  stream to a pino-compatible logger, and `attachMetrics(session, record)` bridges it
+  to a duck-typed recorder (OpenTelemetry / Prometheus / StatsD). Both zero-dependency
+  (you provide the instance) and return a detach function.
+
 ## [0.6.0] - 2026-10-15
 
 ### Added
@@ -144,7 +158,8 @@ Initial public release. FIX 4.4, initiator (client) side.
 - `newOrderSingle` builder with `Side` / `OrdType` / `TimeInForce` constants.
 - TCP and TLS transport.
 
-[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/samartha-hegde/fixwire/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/samartha-hegde/fixwire/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/samartha-hegde/fixwire/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/samartha-hegde/fixwire/compare/v0.5.0...v0.5.1
