@@ -17,6 +17,13 @@ export interface GroupSpec {
   memberTags: number[];
 }
 
+/** A field of a message, as declared in the dictionary. */
+export interface MessageField {
+  tag: number;
+  name: string;
+  required: boolean;
+}
+
 export interface Dictionary {
   byTag: Map<number, FieldDef>;
   byName: Map<string, number>;
@@ -26,6 +33,8 @@ export interface Dictionary {
   groups: Map<number, GroupSpec>;
   /** msgtype -> tags of top-level required fields. */
   required: Map<string, number[]>;
+  /** msgtype -> all top-level fields (required and optional, in order). */
+  messageFields: Map<string, MessageField[]>;
 }
 
 // Attribute values may be double- or single-quoted (FIX dictionaries use either).
@@ -182,6 +191,7 @@ export function parseDictionary(rawXml: string): Dictionary {
 
   const messages = new Map<string, string>();
   const required = new Map<string, number[]>();
+  const messageFields = new Map<string, MessageField[]>();
   MESSAGE_BLOCK.lastIndex = 0;
   let mm: RegExpExecArray | null;
   while ((mm = MESSAGE_BLOCK.exec(xml)) !== null) {
@@ -192,21 +202,25 @@ export function parseDictionary(rawXml: string): Dictionary {
     const body = mm[2];
     if (body) {
       const reqTags: number[] = [];
+      const fields: MessageField[] = [];
       FIELD_REF.lastIndex = 0;
       let fr: RegExpExecArray | null;
       const topLevel = stripGroups(body);
       while ((fr = FIELD_REF.exec(topLevel)) !== null) {
         const fa = attrs(fr[1] ?? '');
-        if (fa.required === 'Y' && fa.name) {
-          const tag = byName.get(fa.name);
-          if (tag !== undefined) reqTags.push(tag);
-        }
+        if (!fa.name) continue;
+        const tag = byName.get(fa.name);
+        if (tag === undefined) continue;
+        const isRequired = fa.required === 'Y';
+        fields.push({ tag, name: fa.name, required: isRequired });
+        if (isRequired) reqTags.push(tag);
       }
       if (reqTags.length) required.set(a.msgtype, reqTags);
+      if (fields.length) messageFields.set(a.msgtype, fields);
     }
   }
 
-  return { byTag, byName, messages, groups, required };
+  return { byTag, byName, messages, groups, required, messageFields };
 }
 
 /** A built-in dictionary assembled from the bundled {@link Tag} constants. */
@@ -217,7 +231,14 @@ export function builtinDictionary(): Dictionary {
     byTag.set(tag, { tag, name, type: 'STRING' });
     byName.set(name, tag);
   }
-  return { byTag, byName, messages: new Map(), groups: new Map(), required: new Map() };
+  return {
+    byTag,
+    byName,
+    messages: new Map(),
+    groups: new Map(),
+    required: new Map(),
+    messageFields: new Map(),
+  };
 }
 
 /**

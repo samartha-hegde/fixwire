@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-16
+
+### Added
+
+- **Typed message builders**: `parseDictionary` now exposes per-message field
+  metadata (`Dictionary.messageFields`), and `scripts/generate.ts` emits a typed
+  builder function per message (required fields required, optional ones optional).
+- **External-backed stores**: `WriteThroughSeqStore` and `WriteThroughMessageStore`
+  serve reads from memory and write every change through a callback you wire to
+  Redis / SQL, for durable failover. Zero new dependencies.
+
 ## [0.8.0] - 2026-10-16
 
 ### Added
@@ -172,7 +183,8 @@ Initial public release. FIX 4.4, initiator (client) side.
 - `newOrderSingle` builder with `Side` / `OrdType` / `TimeInForce` constants.
 - TCP and TLS transport.
 
-[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/samartha-hegde/fixwire/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/samartha-hegde/fixwire/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/samartha-hegde/fixwire/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/samartha-hegde/fixwire/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/samartha-hegde/fixwire/compare/v0.5.2...v0.6.0

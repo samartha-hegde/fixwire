@@ -180,3 +180,87 @@ export class FileMessageStore implements MessageStore {
     writeFileSync(this.path, '');
   }
 }
+
+/**
+ * Sequence store backed by an external system (Redis, SQL, ...) for durable
+ * failover. Reads are served from memory (the session's hot path stays sync);
+ * every change is written through a `persist` callback you wire to your backend
+ * (async / fire-and-forget). Load the initial state yourself before constructing
+ * the session, so a standby can resume a session's sequence numbers.
+ *
+ * @example
+ * const state = (await redis.get('seq:CLIENT')) ?? { out: 1, in: 1 };
+ * const store = new WriteThroughSeqStore(state, (s) => void redis.set('seq:CLIENT', s));
+ */
+export class WriteThroughSeqStore implements SeqStore {
+  private out: number;
+  private in: number;
+  private readonly persist: (state: { out: number; in: number }) => void;
+
+  constructor(
+    initial: { out: number; in: number },
+    persist: (state: { out: number; in: number }) => void,
+  ) {
+    this.out = initial.out;
+    this.in = initial.in;
+    this.persist = persist;
+  }
+
+  private save(): void {
+    this.persist({ out: this.out, in: this.in });
+  }
+
+  getNextOut(): number {
+    return this.out;
+  }
+  getNextIn(): number {
+    return this.in;
+  }
+  incrOut(): number {
+    const v = this.out++;
+    this.save();
+    return v;
+  }
+  setOut(n: number): void {
+    this.out = n;
+    this.save();
+  }
+  setIn(n: number): void {
+    this.in = n;
+    this.save();
+  }
+  reset(): void {
+    this.out = 1;
+    this.in = 1;
+    this.save();
+  }
+}
+
+/**
+ * Message store backed by an external system for durable resend/replay across a
+ * failover. Reads serve from memory; every `put` is written through `persist`.
+ * Seed `initial` from your backend before constructing the session.
+ */
+export class WriteThroughMessageStore implements MessageStore {
+  private readonly map = new Map<number, StoredMessage>();
+  private readonly persist: (msg: StoredMessage) => void;
+
+  constructor(initial: StoredMessage[], persist: (msg: StoredMessage) => void) {
+    for (const msg of initial) this.map.set(msg.seq, msg);
+    this.persist = persist;
+  }
+
+  put(msg: StoredMessage): void {
+    this.map.set(msg.seq, msg);
+    this.persist(msg);
+  }
+  get(seq: number): StoredMessage | undefined {
+    return this.map.get(seq);
+  }
+  entries(): StoredMessage[] {
+    return sortedEntries(this.map);
+  }
+  reset(): void {
+    this.map.clear();
+  }
+}

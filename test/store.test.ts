@@ -3,7 +3,14 @@ import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { FileMessageStore, FileStore, MemoryMessageStore } from '../src/index.js';
+import {
+  FileMessageStore,
+  FileStore,
+  MemoryMessageStore,
+  type StoredMessage,
+  WriteThroughMessageStore,
+  WriteThroughSeqStore,
+} from '../src/index.js';
 
 test('FileStore persists sequence numbers across instances', () => {
   const path = join(tmpdir(), `fixwire-store-${process.pid}-${Date.now()}.json`);
@@ -59,4 +66,33 @@ test('message stores expose retained entries ordered by sequence', () => {
   store.put({ seq: 2, msgType: 'D', body: [[11, 'o-2']], sendingTime: 't2' });
   const seqs = store.entries().map((m) => m.seq);
   assert.deepEqual(seqs, [1, 2, 3]);
+});
+
+test('WriteThroughSeqStore serves from memory and persists every change', () => {
+  const saved: Array<{ out: number; in: number }> = [];
+  const store = new WriteThroughSeqStore({ out: 5, in: 3 }, (s) => saved.push(s));
+  assert.equal(store.getNextOut(), 5); // seeded from the backend state
+  assert.equal(store.incrOut(), 5);
+  assert.equal(store.getNextOut(), 6);
+  store.setIn(4);
+  assert.deepEqual(saved, [
+    { out: 6, in: 3 },
+    { out: 6, in: 4 },
+  ]);
+});
+
+test('WriteThroughMessageStore seeds from initial and persists puts', () => {
+  const saved: StoredMessage[] = [];
+  const store = new WriteThroughMessageStore(
+    [{ seq: 1, msgType: 'A', body: [], sendingTime: 't1' }],
+    (m) => saved.push(m),
+  );
+  assert.equal(store.get(1)?.msgType, 'A'); // seeded
+  store.put({ seq: 2, msgType: 'D', body: [[11, 'o']], sendingTime: 't2' });
+  assert.equal(store.get(2)?.msgType, 'D');
+  assert.deepEqual(
+    store.entries().map((m) => m.seq),
+    [1, 2],
+  );
+  assert.equal(saved.length, 1);
 });

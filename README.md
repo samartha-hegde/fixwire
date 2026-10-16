@@ -219,7 +219,8 @@ npm test
 ✔ schedule respects allowed weekdays and holidays
 ✔ attachLogger / attachMetrics bridge the event stream
 ✔ history() returns the outbound message log for audit
-  …58 passing
+✔ write-through stores seed from a backend and persist every change
+  …61 passing
 ```
 
 Decode a FIX message in your browser at the
@@ -288,6 +289,37 @@ const acceptor = new Acceptor({
 });
 ```
 
+## Durability & failover
+
+Sequence numbers and the resend log are pluggable. `FileStore` /
+`FileMessageStore` persist to disk; for a hot standby that can resume a session,
+back them with Redis or SQL via the write-through stores. Reads stay in memory
+(the send path stays synchronous); every change is written through a callback you
+wire to your backend. Load the state before constructing the session:
+
+```ts
+import { WriteThroughSeqStore } from 'fixwire';
+
+const state = (await redis.get('seq:CLIENT')) ?? { out: 1, in: 1 };
+const store = new WriteThroughSeqStore(state, (s) => void redis.set('seq:CLIENT', s));
+const session = new Session({ ...config, store });
+```
+
+(A single FIX session is one stateful connection, so this is for durable
+*failover*, not sharding one session across instances.)
+
+## Typed message builders
+
+`parseDictionary` exposes per-message field metadata (`messageFields`), and the
+codegen emits a typed builder per message from any FIX dictionary:
+
+```bash
+npm run generate -- FIX44.xml > fix44.ts
+# -> newOrderSingle({ clOrdID, symbol, side, orderQty, ordType, price? }): Field[]
+```
+
+Required fields are required parameters; optional ones are optional.
+
 ## Roadmap
 
 Shipped:
@@ -312,11 +344,13 @@ Shipped:
 - [x] Observability adapters: `attachLogger` (pino) and `attachMetrics` (OTel/Prometheus)
 - [x] Message-recovery helpers: `session.history()` and `MessageStore.entries()`
 - [x] Interactive browser [playground](https://samartha-hegde.github.io/fixwire/playground.html) (decode & validate)
+- [x] Dictionary-driven typed message builders (codegen emits a typed builder per message)
+- [x] External-backed stores: `WriteThroughSeqStore` / `WriteThroughMessageStore` (Redis / SQL)
 
 Next, in rough order:
 
-- [ ] Dictionary-driven typed message classes (codegen beyond tag constants)
-- [ ] A persistent queue-backed `MessageStore` (Redis / SQL) for horizontal scale
+- [ ] A terminal TUI for watching a live session (blotter-style)
+- [ ] First-class drop-copy session support
 
 **FIXP / SBE (binary FIX)** is intentionally out of scope for now: it is a
 different session protocol and a schema-driven binary codec, effectively a second

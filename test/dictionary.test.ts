@@ -184,3 +184,15 @@ test('parseDictionary handles single-quoted attributes', () => {
   assert.equal(dict.byName.get('ClOrdID'), 11);
   assert.equal(dict.messages.get('0'), 'Heartbeat');
 });
+
+test('parseDictionary captures per-message fields with required flags', () => {
+  const dict = parseDictionary(
+    "<fix><messages><message name='NewOrderSingle' msgtype='D'>" +
+      "<field name='ClOrdID' required='Y'/><field name='Price' required='N'/></message></messages>" +
+      "<fields><field number='11' name='ClOrdID' type='STRING'/><field number='44' name='Price' type='PRICE'/></fields></fix>",
+  );
+  assert.deepEqual(dict.messageFields.get('D'), [
+    { tag: 11, name: 'ClOrdID', required: true },
+    { tag: 44, name: 'Price', required: false },
+  ]);
+});
