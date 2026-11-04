@@ -398,15 +398,21 @@ export class Session extends EventEmitter {
     const explicit = opts.seqNum !== undefined;
     const seq = opts.seqNum ?? this.store.incrOut();
     const ts = utcTimestamp();
+    // Canonical FIX StandardHeader order: SenderCompID/TargetCompID precede
+    // MsgSeqNum, PossDupFlag precedes SendingTime, OrigSendingTime follows it.
+    // Lenient engines accept any order, but strict venues silently drop a
+    // misordered header, so emit the standard sequence.
     const header: Field[] = [
       [Tag.MsgType, msgType],
-      [Tag.MsgSeqNum, String(seq)],
       [Tag.SenderCompID, this.cfg.senderCompId],
       [Tag.TargetCompID, this.cfg.targetCompId],
-      [Tag.SendingTime, ts],
+      [Tag.MsgSeqNum, String(seq)],
     ];
     if (opts.possDup) {
       header.push([Tag.PossDupFlag, 'Y']);
+    }
+    header.push([Tag.SendingTime, ts]);
+    if (opts.possDup) {
       header.push([Tag.OrigSendingTime, opts.origSendingTime ?? ts]);
     }
     const wire = encode([...header, ...body], this.cfg.beginString);

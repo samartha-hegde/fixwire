@@ -594,3 +594,42 @@ test('history() returns the outbound message log for audit', async () => {
   session.disconnect();
   acc.close();
 });
+
+test('outbound messages use the canonical FIX standard-header order', async () => {
+  const sent: ReturnType<typeof parse>[] = [];
+  const acc = await startAcceptor((msg, send) => {
+    if (msg.msgType === MsgType.Logon) replyLogon(send);
+  });
+  const session = newSession(acc.port);
+  session.on('sent', (w) => sent.push(parse(w)));
+  await new Promise<void>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('logon', () => {
+      session.send(MsgType.NewOrderSingle, [[Tag.ClOrdID, 'o-1']]);
+      resolve();
+    });
+    session.connect();
+  });
+  session.disconnect();
+  acc.close();
+
+  // Every outbound header (Logon, NewOrderSingle, ...) must follow the standard
+  // sequence: SenderCompID/TargetCompID before MsgSeqNum, then SendingTime.
+  assert.ok(sent.length > 0);
+  for (const m of sent) {
+    const tags = m.fields.map(([t]) => t);
+    const at = (tag: number) => tags.indexOf(tag);
+    assert.ok(at(Tag.SenderCompID) < at(Tag.MsgSeqNum), `49 before 34 (${m.msgType})`);
+    assert.ok(at(Tag.TargetCompID) < at(Tag.MsgSeqNum), `56 before 34 (${m.msgType})`);
+    assert.ok(at(Tag.MsgSeqNum) < at(Tag.SendingTime), `34 before 52 (${m.msgType})`);
+    assert.deepEqual(tags.slice(0, 7), [
+      Tag.BeginString,
+      Tag.BodyLength,
+      Tag.MsgType,
+      Tag.SenderCompID,
+      Tag.TargetCompID,
+      Tag.MsgSeqNum,
+      Tag.SendingTime,
+    ]);
+  }
+});
