@@ -633,3 +633,44 @@ test('outbound messages use the canonical FIX standard-header order', async () =
     ]);
   }
 });
+
+test('emits optional header routing fields (sub-IDs, on-behalf-of, deliver-to) in standard positions', async () => {
+  const sent: ReturnType<typeof parse>[] = [];
+  const acc = await startAcceptor((msg, send) => {
+    if (msg.msgType === MsgType.Logon) replyLogon(send);
+  });
+  const session = newSession(acc.port, {
+    senderSubId: 'DESK1',
+    targetSubId: 'TGT1',
+    onBehalfOfCompId: 'OBO',
+    deliverToCompId: 'DELIV',
+  });
+  session.on('sent', (w) => sent.push(parse(w)));
+  await new Promise<void>((resolve, reject) => {
+    session.on('error', reject);
+    session.on('logon', () => {
+      session.send(MsgType.NewOrderSingle, [[Tag.ClOrdID, 'o-1']]);
+      resolve();
+    });
+    session.connect();
+  });
+  session.disconnect();
+  acc.close();
+
+  for (const m of sent) {
+    const tags = m.fields.map(([t]) => t);
+    const at = (tag: number) => tags.indexOf(tag);
+    // Values present
+    assert.equal(m.get(Tag.SenderSubID), 'DESK1');
+    assert.equal(m.get(Tag.DeliverToCompID), 'DELIV');
+    assert.equal(m.get(Tag.OnBehalfOfCompID), 'OBO');
+    // Positions: OnBehalfOf/DeliverTo between TargetCompID and MsgSeqNum
+    assert.ok(at(Tag.TargetCompID) < at(Tag.OnBehalfOfCompID), 'OnBehalfOf after 56');
+    assert.ok(at(Tag.OnBehalfOfCompID) < at(Tag.DeliverToCompID), '115 before 128');
+    assert.ok(at(Tag.DeliverToCompID) < at(Tag.MsgSeqNum), 'DeliverTo before 34');
+    // Sub-IDs between MsgSeqNum and SendingTime
+    assert.ok(at(Tag.MsgSeqNum) < at(Tag.SenderSubID), 'SenderSubID after 34');
+    assert.ok(at(Tag.SenderSubID) < at(Tag.TargetSubID), '50 before 57');
+    assert.ok(at(Tag.TargetSubID) < at(Tag.SendingTime), 'sub-IDs before 52');
+  }
+});

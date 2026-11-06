@@ -10,6 +10,13 @@ export const Tag = {
   MsgSeqNum: 34,
   SenderCompID: 49,
   TargetCompID: 56,
+  // Optional header routing fields (sub-IDs, on-behalf-of, deliver-to)
+  SenderSubID: 50,
+  TargetSubID: 57,
+  OnBehalfOfCompID: 115,
+  OnBehalfOfSubID: 116,
+  DeliverToCompID: 128,
+  DeliverToSubID: 129,
   SendingTime: 52,
   PossDupFlag: 43,
   OrigSendingTime: 122,

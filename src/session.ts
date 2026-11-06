@@ -37,6 +37,17 @@ export interface ReconnectOptions {
 export interface SessionConfig {
   senderCompId: string;
   targetCompId: string;
+  /**
+   * Optional StandardHeader routing fields, emitted on every message in canonical
+   * position when set. Common in institutional FX / prime-brokerage routing:
+   * sub-IDs (desk/account), on-behalf-of and deliver-to (give-up, multi-party).
+   */
+  senderSubId?: string;
+  targetSubId?: string;
+  onBehalfOfCompId?: string;
+  onBehalfOfSubId?: string;
+  deliverToCompId?: string;
+  deliverToSubId?: string;
   host: string;
   port: number;
   tls?: TransportOptions['tls'];
@@ -159,6 +170,12 @@ export class Session extends EventEmitter {
       | 'websocketUrl'
       | 'schedule'
       | 'authenticate'
+      | 'senderSubId'
+      | 'targetSubId'
+      | 'onBehalfOfCompId'
+      | 'onBehalfOfSubId'
+      | 'deliverToCompId'
+      | 'deliverToSubId'
     >
   > &
     Pick<
@@ -171,6 +188,12 @@ export class Session extends EventEmitter {
       | 'dictionary'
       | 'validateRequired'
       | 'allowedMsgTypes'
+      | 'senderSubId'
+      | 'targetSubId'
+      | 'onBehalfOfCompId'
+      | 'onBehalfOfSubId'
+      | 'deliverToCompId'
+      | 'deliverToSubId'
       | 'websocketUrl'
       | 'schedule'
       | 'authenticate'
@@ -204,6 +227,12 @@ export class Session extends EventEmitter {
     this.cfg = {
       senderCompId: config.senderCompId,
       targetCompId: config.targetCompId,
+      senderSubId: config.senderSubId,
+      targetSubId: config.targetSubId,
+      onBehalfOfCompId: config.onBehalfOfCompId,
+      onBehalfOfSubId: config.onBehalfOfSubId,
+      deliverToCompId: config.deliverToCompId,
+      deliverToSubId: config.deliverToSubId,
       host: config.host,
       port: config.port,
       tls: config.tls,
@@ -406,8 +435,16 @@ export class Session extends EventEmitter {
       [Tag.MsgType, msgType],
       [Tag.SenderCompID, this.cfg.senderCompId],
       [Tag.TargetCompID, this.cfg.targetCompId],
-      [Tag.MsgSeqNum, String(seq)],
     ];
+    // OnBehalfOfCompID / DeliverToCompID sit between TargetCompID and MsgSeqNum.
+    if (this.cfg.onBehalfOfCompId) header.push([Tag.OnBehalfOfCompID, this.cfg.onBehalfOfCompId]);
+    if (this.cfg.deliverToCompId) header.push([Tag.DeliverToCompID, this.cfg.deliverToCompId]);
+    header.push([Tag.MsgSeqNum, String(seq)]);
+    // Sub-IDs sit between MsgSeqNum and PossDupFlag/SendingTime, in standard order.
+    if (this.cfg.senderSubId) header.push([Tag.SenderSubID, this.cfg.senderSubId]);
+    if (this.cfg.targetSubId) header.push([Tag.TargetSubID, this.cfg.targetSubId]);
+    if (this.cfg.onBehalfOfSubId) header.push([Tag.OnBehalfOfSubID, this.cfg.onBehalfOfSubId]);
+    if (this.cfg.deliverToSubId) header.push([Tag.DeliverToSubID, this.cfg.deliverToSubId]);
     if (opts.possDup) {
       header.push([Tag.PossDupFlag, 'Y']);
     }

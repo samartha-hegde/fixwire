@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-06
+
+### Added
+
+- **Optional StandardHeader routing fields.** `SessionConfig` now accepts
+  `senderSubId` (50), `targetSubId` (57), `onBehalfOfCompId` (115),
+  `onBehalfOfSubId` (116), `deliverToCompId` (128), and `deliverToSubId` (129).
+  Each is emitted on every outbound message in its canonical header position
+  (OnBehalfOf/DeliverTo between TargetCompID and MsgSeqNum; sub-IDs between
+  MsgSeqNum and SendingTime) when set, and omitted otherwise. These are common
+  in institutional FX / prime-brokerage routing (desk/account sub-IDs, give-up
+  and multi-party order routing).
+
 ## [0.10.0] - 2026-11-04
 
 ### Added
